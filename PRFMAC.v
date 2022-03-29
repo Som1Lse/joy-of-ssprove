@@ -52,11 +52,17 @@ Definition Words: choice_type := chFin (mkpos Words_N).
 Definition Key_N: nat := 2^n.
 Definition Key: choice_type := chFin (mkpos Key_N).
 
+Notation " 'word " := (Words) (in custom pack_type at level 2).
+Notation " 'key " := (Key) (in custom pack_type at level 2).
+
+Notation " 'word " := (Words) (at level 2): package_scope.
+Notation " 'key " := (Key) (at level 2): package_scope.
+
 #[local] Open Scope package_scope.
 
 Definition key_location: Location := ('option Key ; 0).
-Definition table_location: Location := (chMap 'nat ('fin (2^n)%N) ; 1).
-Definition mac_table_location: Location := (chMap ('nat × 'nat) ('unit) ; 2).
+Definition table_location: Location := (chMap 'word 'key ; 1).
+Definition mac_table_location: Location := (chMap ('word × 'word) ('unit) ; 2).
 Definition lookup: nat := 3.
 Definition encrypt: nat := 4.
 Definition gettag: nat := 5.
@@ -65,14 +71,9 @@ Definition guess: nat := 7.
 
 Context (PRF: Words -> Key -> Key).
 
-Notation " 'word " := ('fin (2^n)%N) (in custom pack_type at level 2).
-Notation " 'key " := ('fin (2^n)%N) (in custom pack_type at level 2).
-Definition i_key: nat := 2^n.
-Definition i_words: nat := 2^n.
-
-Definition kgen {L: { fset Location }}: code L [interface] 'fin (2^n) :=
+Definition kgen {L: { fset Location }}: code L [interface] 'key :=
   {code
-    k ← sample uniform i_key ;;
+    k <$ uniform Key_N ;;
     ret k
   }.
 
@@ -152,7 +153,7 @@ Definition GUESS_pkg_tt:
       | Some r =>
           ret r
       end ;;
-      ret (Nat.eqb r t)
+      ret (r == t)
     }
   ].
 
@@ -178,7 +179,7 @@ Definition GUESS_pkg_ff:
       T ← get table_location ;;
       match getm T m with
       | None   => ret false
-      | Some r => ret (Nat.eqb r t)
+      | Some r => ret (r == t)
       end
     }
   ].
@@ -187,18 +188,6 @@ Definition GUESS := mkpair GUESS_pkg_tt GUESS_pkg_ff.
 
 Definition TAG_location_tt: {fset Location} := fset [:: key_location].
 Definition TAG_location_ff: {fset Location} := fset [:: key_location; mac_table_location].
-
-Definition convert_word_key (wk: Words * Key): nat * nat :=
-  let (w, k) := wk in (nat_of_ord w, nat_of_ord k).
-
-Lemma nat_ord_inj (a b: Words):
-  nat_of_ord a = nat_of_ord b <-> a = b.
-Proof.
-  split => H.
-  - apply ord_inj, H.
-  - subst.
-    reflexivity.
-Qed.
 
 (*
      TAG true
@@ -210,8 +199,8 @@ Qed.
   ≈₀ GUESS_TAG_pkg_2 ∘ GUESS false
   ≈₀ EVAL_TAG_pkg_ff ∘ EVAL false
   ≈  EVAL_TAG_pkg_ff ∘ EVAL true
-  ≈₀ TAG false
-*)
+  ≈₀ TAG false *)
+
 
 Definition TAG_pkg_tt:
   package TAG_location_tt
@@ -237,9 +226,9 @@ Definition TAG_pkg_tt:
       | None =>
         k ← kgen ;;
         #put key_location := Some k ;;
-        ret (Nat.eqb (PRF m k) t)
+        ret ((PRF m k) == t)
       | Some k =>
-        ret (Nat.eqb (PRF m k) t)
+        ret ((PRF m k) == t)
       end
     }
   ].
@@ -265,12 +254,12 @@ Definition TAG_pkg_ff:
       end ;;
       t ← ret (PRF m k) ;;
       T ← get mac_table_location ;;
-      #put mac_table_location := (setm T (convert_word_key (m, t)) tt) ;;
+      #put mac_table_location := (setm T (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'key): 'bool {
       T ← get mac_table_location ;;
-      match getm T (convert_word_key (m, t)) with
+      match getm T (m, t) with
       | None   => ret false
       | Some _ => ret true
       end
@@ -297,7 +286,7 @@ Definition EVAL_TAG_pkg_tt:
     #def #[checktag] ('(m, t): 'word × 'key): 'bool {
       #import {sig #[lookup]: 'word → 'key } as lookup ;;
       r ← lookup m ;;
-      ret (Nat.eqb r t)
+      ret (r == t)
     }
   ].
 
@@ -312,12 +301,12 @@ Definition EVAL_TAG_pkg_ff:
       #import {sig #[lookup]: 'word → 'key } as lookup ;;
       t ← lookup m ;;
       T ← get mac_table_location ;;
-      #put mac_table_location := (setm T (convert_word_key (m, t)) tt) ;;
+      #put mac_table_location := (setm T (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'key): 'bool {
       T ← get mac_table_location ;;
-      match getm T (convert_word_key (m, t)) with
+      match getm T (m, t) with
       | None   => ret false
       | Some _ => ret true
       end
@@ -362,7 +351,7 @@ Definition GUESS_TAG_pkg_1:
       #import {sig #[lookup]: 'word → 'key } as lookup ;;
       t ← lookup m ;;
       T ← get mac_table_location ;;
-      #put mac_table_location := (setm T (convert_word_key (m, t)) tt) ;;
+      #put mac_table_location := (setm T (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'key): 'bool {
@@ -385,12 +374,12 @@ Definition GUESS_TAG_pkg_2:
       #import {sig #[lookup]: 'word → 'key } as lookup ;;
       t ← lookup m ;;
       T ← get mac_table_location ;;
-      #put mac_table_location := (setm T (convert_word_key (m, t)) tt) ;;
+      #put mac_table_location := (setm T (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'key): 'bool {
       T ← get mac_table_location ;;
-      match getm T (convert_word_key (m, t)) with
+      match getm T (m, t) with
       | None   => ret false
       | Some _ => ret true
       end
@@ -474,7 +463,7 @@ Proof.
     (fun '(h0, h1) => h0 = h1) ⋊
     couple_rhs table_location mac_table_location
       (fun T1 T2 => forall m t,
-        getm T2 (convert_word_key (m, t)) = Some tt <-> getm T1 m = Some t)
+        getm T2 (m, t) = Some tt <-> getm T1 m = Some t)
   ).
   1: {
     ssprove_invariant;
@@ -522,8 +511,7 @@ Proof.
           auto.
         simpl in *.
         move /eqP in Heqk.
-        case: Heqk.
-        rewrite !nat_ord_inj => ? ?.
+        case: Heqk => ? ?.
         subst.
         exact.
       }
@@ -545,13 +533,13 @@ Proof.
         ssprove_invariant => m0 t.
         rewrite !setmE.
         rewrite xpair_eqE.
-        destruct (_ m0 == _ m) eqn:Heqm.
+        destruct (m0 == m) eqn:Heqm;
+          rewrite Heqm.
         2: apply Hinv.
-        destruct (_ t == _ a) eqn:Heqt;
+        destruct (t == a) eqn:Heqt;
+          rewrite Heqt;
           move /eqP in Heqm;
           move /eqP in Heqt;
-          rewrite nat_ord_inj in Heqm;
-          rewrite nat_ord_inj in Heqt;
           subst.
         1: exact.
         rewrite Hinv Heq.
@@ -582,13 +570,12 @@ Proof.
     all: subst o1 o2.
     + rewrite Hinv in Heq2.
       rewrite Heq2.
-      rewrite PeanoNat.Nat.eqb_refl.
+      rewrite eq_refl.
       shelve.
     + rewrite -Hinv in Heq1.
-      destruct (Nat.eqb _ _) eqn:Heq.
+      destruct (_ == _) eqn:Heq.
       1: {
         move /eqP in Heq.
-        rewrite nat_ord_inj in Heq.
         subst.
         rewrite Heq2 in Heq1.
         discriminate.
@@ -676,8 +663,7 @@ Proof.
   by [].
 Qed.
 
-Theorem security_based_on_prf:
-  forall LA A,
+Theorem security_based_on_prf LA A:
     ValidPackage LA
       [interface
         #val #[gettag]: 'word → 'key ;
@@ -689,7 +675,7 @@ Theorem security_based_on_prf:
     statistical_gap A +
     prf_epsilon (A ∘ EVAL_TAG_pkg_ff).
 Proof.
-  intros LA A vA H.
+  intros vA H.
   unfold prf_epsilon, statistical_gap.
   rewrite !Advantage_E.
   rewrite Advantage_sym.
@@ -734,5 +720,3 @@ Proof.
 Qed.
 
 End PRFMAC_example.
-
-Definition TAG_advantage PRFF A n := Advantage (TAG n (PRFF n)) A.
