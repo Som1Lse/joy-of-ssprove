@@ -93,7 +93,7 @@ fun w k =>
 Next Obligation.
   destruct w as [w Hw], k as [k Hk].
   destruct w as [|w'], k as [|k'].
-  1,2,3: by simpl; rewrite ?Pnat.SuccNat2Pos.id_succ.
+  1,2,3: by rewrite /= ?Pnat.SuccNat2Pos.id_succ.
   move: (log2_lt_pow2 _ _ Hw) => H1.
   move: (log2_lt_pow2 _ _ Hk) => H2.
   move: (BinNat.N.max_lub_lt _ _ _ H1 H2) => Hm.
@@ -107,8 +107,7 @@ Next Obligation.
   rewrite Nnat.N2Nat.inj_compare.
   rewrite PeanoNat.Nat.compare_lt_iff.
   rewrite -pow2_inj.
-  move /ltP.
-  apply.
+  by move /ltP.
 Qed.
 
 Notation "m ⊕ k" := (plus m k) (at level 70).
@@ -148,6 +147,11 @@ Qed.
 Notation " 'word " := ('fin (2^n)%N) (in custom pack_type at level 2).
 Notation " 'word " := ('fin (2^n)%N) (at level 2): package_scope.
 
+Definition chSeq t := chMap 'nat t.
+
+Notation " 'seq t " := (chSeq t) (in custom pack_type at level 2).
+Notation " 'seq t " := (chSeq t) (at level 2): package_scope.
+
 (*
   We can't use sets directly in [choice_type] so instead we use a map to units.
   We can then use [domm] to get the domain, which is a set.
@@ -156,6 +160,12 @@ Definition chSet t := chMap t 'unit.
 
 Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
 Notation " 'set t " := (chSet t) (at level 2): package_scope.
+
+Definition seq_to_map {T} (u: seq T): {fmap nat -> T} :=
+  mkfmap (zip (iota 0 (size u)) u).
+
+Definition map_to_seq {T} (m: {fmap nat -> T}): seq T :=
+  pmap m (domm m).
 
 Definition share (m: Words):
   code fset0
@@ -167,7 +177,7 @@ Definition share (m: Words):
     ret [fmap (0, s0) ; (1, s0 ⊕ m)]
   }.
 
-Definition reconstruct (s0 s1: Words) :
+Definition reconstruct (s0 s1: Words):
   code fset0
     [interface]
     'fin (2^n) :=
@@ -177,77 +187,63 @@ Definition reconstruct (s0 s1: Words) :
 
 Definition share_lr: nat := 0.
 
-(* Some convenience functions to compute a submap. *)
-Fixpoint subm_seq {K: ordType} {V} (m: {fmap K -> V}) (u: seq K): seq (K * V) :=
-  match u with
-  | k :: u' =>
-    match m k with
-    | Some v => (k, v) :: subm_seq m u'
-    | None => subm_seq m u'
-    end
-  | [::] => [::]
-  end.
-
-Definition subm {K: ordType} {V} (m: {fmap K -> V}) (u: seq K): {fmap K -> V} :=
-  mkfmap (subm_seq m u).
-
-Definition TSSS_pkg_tt :
+Definition TSSS_pkg_tt:
   package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → {map 'nat → 'word} ] :=
+    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
   [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): {map 'nat → 'word} {
+    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
       if size (domm u) >= 2 then ret emptym
       else
       s ← share mr ;;
-      ret (subm s (domm u))
+      ret (seq_to_map (pmap s (domm u)))
     }
   ].
 
-Definition TSSS_HYB_pkg_tt :
+Definition TSSS_pkg_ff:
   package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → {map 'nat → 'word} ] :=
+    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
   [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): {map 'nat → 'word} {
-      match FSet.fsval (domm u) with
-      | [:: 0] =>
-        s0 <$ uniform Words_N ;;
-        ret [fmap (0, s0)]
-      | [:: 1] =>
-        s0 <$ uniform Words_N ;;
-        s1 ← ret (s0 ⊕ mr) ;;
-        ret [fmap (1, s1)]
-      | _ => ret emptym
-      end
-    }
-  ].
-
-Definition TSSS_HYB_pkg_ff :
-  package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → {map 'nat → 'word} ] :=
-  [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): {map 'nat → 'word} {
-      match FSet.fsval (domm u) with
-      | [:: 0] =>
-        s0 <$ uniform Words_N ;;
-        ret [fmap (0, s0)]
-      | [:: 1] =>
-        s0 <$ uniform Words_N ;;
-        s1 ← ret (s0 ⊕ ml) ;;
-        ret [fmap (1, s1)]
-      | _ => ret emptym
-      end
-    }
-  ].
-
-Definition TSSS_pkg_ff :
-  package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → {map 'nat → 'word} ] :=
-  [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): {map 'nat → 'word} {
+    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
       if size (domm u) >= 2 then ret emptym
       else
       s ← share ml ;;
-      ret (subm s (domm u))
+      ret (seq_to_map (pmap s (domm u)))
+    }
+  ].
+
+Definition TSSS_HYB_pkg_tt:
+  package fset0 [interface]
+    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
+  [package
+    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
+      match FSet.fsval (domm u) with
+      | [:: 0] =>
+        s0 <$ uniform Words_N ;;
+        ret (seq_to_map [:: s0])
+      | [:: 1] =>
+        s0 <$ uniform Words_N ;;
+        s1 ← ret (s0 ⊕ mr) ;;
+        ret (seq_to_map [:: s1])
+      | _ => ret emptym
+      end
+    }
+  ].
+
+Definition TSSS_HYB_pkg_ff:
+  package fset0 [interface]
+    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
+  [package
+    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
+      match FSet.fsval (domm u) with
+      | [:: 0] =>
+        s0 <$ uniform Words_N ;;
+        ret (seq_to_map [:: s0])
+      | [:: 1] =>
+        s0 <$ uniform Words_N ;;
+        s1 ← ret (s0 ⊕ ml) ;;
+        ret (seq_to_map [:: s1])
+      | _ => ret emptym
+      end
     }
   ].
 
@@ -304,8 +300,8 @@ Proof.
   assert (bij_f: bijective f).
   {
     subst f.
-    by exists (fun x => (x ⊕ (ml ⊕ mr))) => x;
-      apply plus_involutive.
+    exists (fun x => (x ⊕ (ml ⊕ mr))) => x.
+    all: by apply plus_involutive.
   }
   apply r_uniform_bij with (1:=bij_f) => x.
   unfold f.
@@ -344,7 +340,7 @@ Qed.
 
 Theorem unconditional_secrecy LA A:
   ValidPackage LA
-    [interface #val #[share_lr] : 'word × 'word × 'set 'nat → {map 'nat → 'word} ] A_export A ->
+    [interface #val #[share_lr] : 'word × 'word × 'set 'nat → 'seq 'word ] A_export A ->
   Advantage TSSS A = 0%R.
 Proof.
   intros vA.
