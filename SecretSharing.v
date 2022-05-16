@@ -1,4 +1,4 @@
-(*
+(**
   This formalises Theorem 3.6 from "The Joy of Cryptography" (p. 51).
   It is a simple 2-out-of-2 secret-sharing scheme with perfect security,
   based on XOR.
@@ -47,76 +47,65 @@ Variable (n: nat).
 Definition Words_N: nat := 2^n.
 Definition Words: choice_type := chFin (mkpos Words_N).
 
-(*
+(**
   The first bit is a formalisation of [plus] (XOR).
   It is similar to the definitions in OTP.v and PRF.v, but it has been split
   into lemmas to hopefully be easier to read.
   It is still somewhat unwieldy though.
 *)
 
-(* Lemmas for the [plus] obligation. *)
+(**
+  Lemmas for the [plus] obligation.
+*)
 Lemma pow2_inj m:
-  (2 ^ m)%nat = BinNat.N.to_nat (BinNat.N.pow (BinNums.Npos (BinNums.xO 1%AC)) (BinNat.N.of_nat m)).
+  (2 ^ m)%N = BinNat.N.to_nat (BinNat.N.pow (BinNums.Npos (BinNums.xO 1%AC)) (BinNat.N.of_nat m)).
 Proof.
-  elim m => [ // | m' IHm ].
-  rewrite expnSr.
-  rewrite Nnat.Nat2N.inj_succ.
-  rewrite BinNat.N.pow_succ_r'.
-  rewrite Nnat.N2Nat.inj_mul.
-  rewrite PeanoNat.Nat.mul_comm.
-  by apply f_equal2.
+  elim: m => [// | m IHm].
+  rewrite expnSr Nnat.Nat2N.inj_succ BinNat.N.pow_succ_r' Nnat.N2Nat.inj_mul PeanoNat.Nat.mul_comm.
+  by apply: f_equal2.
 Qed.
 
 Lemma log2_lt_pow2 w m:
-  (w.+1 < 2^m)%nat ->
+  (w.+1 < 2^m)%N ->
   BinNat.N.lt (BinNat.N.log2 (BinNat.N.of_nat w.+1)) (BinNat.N.of_nat m).
 Proof.
-  move => H.
+  move=> H.
   rewrite -BinNat.N.log2_lt_pow2.
-  2:{
-    rewrite Nnat.Nat2N.inj_succ.
-    by apply BinNat.N.lt_0_succ.
-  }
-  unfold BinNat.N.lt.
-  rewrite Nnat.N2Nat.inj_compare.
-  rewrite PeanoNat.Nat.compare_lt_iff.
-  rewrite -pow2_inj.
-  rewrite Nnat.Nat2N.id.
-  by apply /ltP.
+  - rewrite /BinNat.N.lt Nnat.N2Nat.inj_compare PeanoNat.Nat.compare_lt_iff -pow2_inj Nnat.Nat2N.id.
+    by apply /ltP.
+  - rewrite Nnat.Nat2N.inj_succ.
+    by apply: BinNat.N.lt_0_succ.
 Qed.
 
-#[program] Definition plus: Words -> Words -> Words :=
-fun w k =>
+#[program] Definition plus (w k: Words): Words :=
   @Ordinal _ (BinNat.N.to_nat (BinNat.N.lxor
-      (BinNat.N.of_nat (nat_of_ord w))
-      (BinNat.N.of_nat (nat_of_ord k)))) _.
+    (BinNat.N.of_nat (nat_of_ord w))
+    (BinNat.N.of_nat (nat_of_ord k)))) _.
 Next Obligation.
-  destruct w as [w Hw], k as [k Hk].
-  destruct w as [|w'], k as [|k'].
-  1,2,3: by rewrite /= ?Pnat.SuccNat2Pos.id_succ.
+  move: w k => [[|w] Hw] [[|k] Hk].
+  1-3: by rewrite /= ?Pnat.SuccNat2Pos.id_succ.
   move: (log2_lt_pow2 _ _ Hw) => H1.
   move: (log2_lt_pow2 _ _ Hk) => H2.
   move: (BinNat.N.max_lub_lt _ _ _ H1 H2) => Hm.
-  case: (BinNat.N.eq_dec (BinNat.N.lxor (BinNat.N.of_nat w'.+1) (BinNat.N.of_nat k'.+1)) BinNat.N0) => H0.
+  case: (BinNat.N.eq_dec (BinNat.N.lxor (BinNat.N.of_nat w.+1) (BinNat.N.of_nat k.+1)) BinNat.N0) => H0.
   1: by rewrite H0 expn_gt0.
-  move: (BinNat.N.log2_lxor (BinNat.N.of_nat w'.+1) (BinNat.N.of_nat k'.+1)) => Hbound.
+  move: (BinNat.N.log2_lxor (BinNat.N.of_nat w.+1) (BinNat.N.of_nat k.+1)) => Hbound.
   move: (BinNat.N.le_lt_trans _ _ _ Hbound Hm).
   rewrite -BinNat.N.log2_lt_pow2.
   2: by apply BinNat.N.neq_0_lt_0.
-  unfold BinNat.N.lt.
-  rewrite Nnat.N2Nat.inj_compare.
-  rewrite PeanoNat.Nat.compare_lt_iff.
-  rewrite -pow2_inj.
+  rewrite /BinNat.N.lt Nnat.N2Nat.inj_compare PeanoNat.Nat.compare_lt_iff -pow2_inj.
   by move /ltP.
 Qed.
 
 Notation "m ⊕ k" := (plus m k) (at level 70).
 
-(* Some lemmas for [plus] itself. *)
+(**
+  Some lemmas for [plus] itself.
+*)
 Lemma plus_comm m k:
   (m ⊕ k) = (k ⊕ m).
 Proof.
-  apply ord_inj.
+  apply: ord_inj.
   case: m => m ? /=.
   by rewrite BinNat.N.lxor_comm.
 Qed.
@@ -124,7 +113,7 @@ Qed.
 Lemma plus_assoc m l k:
   ((m ⊕ l) ⊕ k) = (m ⊕ (l ⊕ k)).
 Proof.
-  apply ord_inj.
+  apply: ord_inj.
   case: m => m ? /=.
   rewrite !Nnat.N2Nat.id.
   by rewrite BinNat.N.lxor_assoc.
@@ -134,7 +123,7 @@ Lemma plus_involutive m k:
   (m ⊕ k) ⊕ k = m.
 Proof.
   rewrite plus_assoc.
-  apply ord_inj.
+  apply: ord_inj.
   case: m => m ? /=.
   rewrite Nnat.N2Nat.id.
   rewrite BinNat.N.lxor_nilpotent.
@@ -152,7 +141,7 @@ Definition chSeq t := chMap 'nat t.
 Notation " 'seq t " := (chSeq t) (in custom pack_type at level 2).
 Notation " 'seq t " := (chSeq t) (at level 2): package_scope.
 
-(*
+(**
   We can't use sets directly in [choice_type] so instead we use a map to units.
   We can then use [domm] to get the domain, which is a set.
 *)
@@ -160,12 +149,6 @@ Definition chSet t := chMap t 'unit.
 
 Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
 Notation " 'set t " := (chSet t) (at level 2): package_scope.
-
-Definition seq_to_map {T} (u: seq T): {fmap nat -> T} :=
-  mkfmap (zip (iota 0 (size u)) u).
-
-Definition map_to_seq {T} (m: {fmap nat -> T}): seq T :=
-  pmap m (domm m).
 
 Definition share (m: Words):
   code fset0
@@ -195,7 +178,7 @@ Definition TSSS_pkg_tt:
       if size (domm u) >= 2 then ret emptym
       else
       s ← share mr ;;
-      ret (seq_to_map (pmap s (domm u)))
+      ret (fmap_of_seq (pmap s (domm u)))
     }
   ].
 
@@ -207,7 +190,7 @@ Definition TSSS_pkg_ff:
       if size (domm u) >= 2 then ret emptym
       else
       s ← share ml ;;
-      ret (seq_to_map (pmap s (domm u)))
+      ret (fmap_of_seq (pmap s (domm u)))
     }
   ].
 
@@ -219,11 +202,11 @@ Definition TSSS_HYB_pkg_tt:
       match FSet.fsval (domm u) with
       | [:: 0] =>
         s0 <$ uniform Words_N ;;
-        ret (seq_to_map [:: s0])
+        ret (fmap_of_seq [:: s0])
       | [:: 1] =>
         s0 <$ uniform Words_N ;;
         s1 ← ret (s0 ⊕ mr) ;;
-        ret (seq_to_map [:: s1])
+        ret (fmap_of_seq [:: s1])
       | _ => ret emptym
       end
     }
@@ -237,11 +220,11 @@ Definition TSSS_HYB_pkg_ff:
       match FSet.fsval (domm u) with
       | [:: 0] =>
         s0 <$ uniform Words_N ;;
-        ret (seq_to_map [:: s0])
+        ret (fmap_of_seq [:: s0])
       | [:: 1] =>
         s0 <$ uniform Words_N ;;
         s1 ← ret (s0 ⊕ ml) ;;
-        ret (seq_to_map [:: s1])
+        ret (fmap_of_seq [:: s1])
       | _ => ret emptym
       end
     }
@@ -257,21 +240,19 @@ Definition TSSS_HYB := mkpair TSSS_HYB_pkg_tt TSSS_HYB_pkg_ff.
 Lemma TSSS_HYB_equiv_tt:
   TSSS true ≈₀ TSSS_HYB true.
 Proof.
-  apply eq_rel_perf_ind_eq.
+  apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
   apply rpost_weaken_rule with eq.
   2: intros [] [] Heq; by case: Heq.
   case m => ml [mr u].
   set u' := _ (domm u).
-  case: u' => [|a u'].
+  case: u' => [|a u'] /=.
   1: {
-    cbn.
-    apply: r_const_sample_L => ?.
+    apply: r_dead_sample_L.
     by apply: rreflexivity_rule.
   }
-  case: u' => [|? ?].
+  case: u' => [|? ?] /=.
   2: {
-    simpl.
     case: a => [|[|?]].
     all: by apply: rreflexivity_rule.
   }
@@ -284,7 +265,7 @@ Qed.
 Lemma TSSS_HYB_equiv:
   TSSS_HYB true ≈₀ TSSS_HYB false.
 Proof.
-  apply eq_rel_perf_ind_eq.
+  apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
   apply rpost_weaken_rule with eq.
   2: intros [] [] Heq; by case: Heq.
@@ -301,7 +282,7 @@ Proof.
   {
     subst f.
     exists (fun x => (x ⊕ (ml ⊕ mr))) => x.
-    all: by apply plus_involutive.
+    all: by apply: plus_involutive.
   }
   apply r_uniform_bij with (1:=bij_f) => x.
   unfold f.
@@ -314,21 +295,19 @@ Qed.
 Lemma TSSS_HYB_equiv_ff:
   TSSS_HYB false ≈₀ TSSS false.
 Proof.
-  apply eq_rel_perf_ind_eq.
+  apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
   apply rpost_weaken_rule with eq.
   2: intros [] [] Heq; by case: Heq.
   case m => ml [mr u].
   set u' := _ (domm u).
-  case: u' => [|a u'].
+  case: u' => [|a u'] /=.
   1: {
-    cbn.
-    apply: r_const_sample_R => ?.
+    apply: r_dead_sample_R.
     by apply: rreflexivity_rule.
   }
-  case: u' => [|? ?].
+  case: u' => [|? ?] /=.
   2: {
-    simpl.
     case: a => [|[|?]].
     all: by apply: rreflexivity_rule.
   }
@@ -340,20 +319,21 @@ Qed.
 
 Theorem unconditional_secrecy LA A:
   ValidPackage LA
-    [interface #val #[share_lr] : 'word × 'word × 'set 'nat → 'seq 'word ] A_export A ->
+    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] A_export A ->
   Advantage TSSS A = 0%R.
 Proof.
-  intros vA.
-  rewrite Advantage_E.
-  rewrite Advantage_sym.
+  move=> vA.
+  rewrite Advantage_E Advantage_sym.
   ssprove triangle (TSSS true) [::
     pack (TSSS_HYB true)  ;
     pack (TSSS_HYB false)
   ] (TSSS false) A as ineq.
-  rewrite TSSS_HYB_equiv_tt ?GRing.add0r ?fdisjoints0 // in ineq.
-  rewrite TSSS_HYB_equiv    ?GRing.addr0 ?fdisjoints0 // in ineq.
-  rewrite TSSS_HYB_equiv_ff ?GRing.addr0 ?fdisjoints0 // in ineq.
-  by apply AdvantageE_le_0.
+  apply: AdvantageE_le_0.
+  apply: le_trans.
+  1: by apply: ineq.
+  rewrite TSSS_HYB_equiv_tt ?fdisjoints0 // GRing.add0r.
+  rewrite TSSS_HYB_equiv    ?fdisjoints0 // GRing.add0r.
+  by rewrite TSSS_HYB_equiv_ff ?fdisjoints0.
 Qed.
 
 End SecretSharing_example.

@@ -1,4 +1,4 @@
-(*
+(**
   This formalises Lemma 3.12 and Theorem 3.13 from "The Joy of Cryptography"
   (p. 60).
   It formalises Shamir's Secret Sharing scheme and proves that it has perfect
@@ -50,7 +50,7 @@ Import Order.POrderTheory.
 
 Local Open Scope ring_scope.
 
-(*
+(**
   First step is to define Lagrange interpolation.
   This is implemented in the [lagrange_poly] function, which is split up into
   several helper functions.
@@ -76,7 +76,7 @@ Definition lagrange_poly_part {R: unitRingType} (j: R * R * seq (R * R)): {poly 
 Definition lagrange_poly {R: unitRingType} (pts: seq (R * R)): {poly R} :=
   \sum_(j <- subseqs pts) lagrange_poly_part j.
 
-(*
+(**
   Then we prove some fundamental properties of Lagrange Interpolation.
   Specifically:
   - [size_lagrange_poly]: The size of a Lagrange polynomial is [<= size pts].
@@ -127,7 +127,7 @@ Proof.
   }
   apply negbT in Heq.
   apply: leq_trans.
-  1: by apply size_mul_leq.
+  1: by apply: size_mul_leq.
   rewrite size_scale.
   - by rewrite (@PolyK R 0) // GRing.oner_neq0.
   - by rewrite GRing.invr_neq0 // GRing.subr_eq0.
@@ -201,25 +201,25 @@ Proof.
   1: {
     rewrite big_seq1 size_cat addn1.
     apply: leq_trans.
-    1: by apply size_scale_leq.
+    1: by apply: size_scale_leq.
     apply: leq_trans.
-    - by apply size_lagrange_basis.
+    - by apply: size_lagrange_basis.
     - by rewrite /unzip1 size_map ltnSn.
   }
   rewrite big_cons.
   apply: leq_trans.
-  1: by apply size_add.
+  1: by apply: size_add.
   rewrite geq_max.
   apply /andP.
   split.
   - rewrite /lagrange_poly_part /=.
     apply: leq_trans.
-    1: by apply size_scale_leq.
+    1: by apply: size_scale_leq.
     replace (size (l ++ [:: m, m' & r])) with (size (unzip1 (l ++ [:: m' & r]))).+1.
-    1: by apply size_lagrange_basis.
+    1: by apply: size_lagrange_basis.
     by rewrite /unzip1 size_map !size_cat -addnS.
   - replace (size (l ++ [:: m, m' & r])) with (size ((l ++ [:: m]) ++ m' :: r)).
-    1: by apply IHr.
+    1: by apply: IHr.
     by rewrite !size_cat addn1 !addnS.
 Qed.
 
@@ -228,7 +228,7 @@ Lemma size_lagrange_poly {R: fieldType} (pts: seq (R * R)):
 Proof.
   case: pts => [|m r].
   - by rewrite /lagrange_poly big_nil size_poly0.
-  - by apply (size_lagrange_poly_part [::]).
+  - by apply: (size_lagrange_poly_part [::]).
 Qed.
 
 Lemma lagrange_poly_correct {R: fieldType} (x y: R) pts:
@@ -237,7 +237,7 @@ Lemma lagrange_poly_correct {R: fieldType} (x y: R) pts:
   (lagrange_poly pts).[x] = y.
 Proof.
   case: pts => [// | m r] Huniq Hin.
-  by apply lagrange_poly_part_correct.
+  by apply: lagrange_poly_part_correct.
 Qed.
 
 Lemma lagrange_poly_unique {R: fieldType} (pts: seq (R * R)) (q: {poly R}):
@@ -252,7 +252,7 @@ Proof.
   1: {
     move: (size_lagrange_poly pts) => Hsize2.
     apply: leq_trans.
-    1: apply size_add.
+    1: apply: size_add.
     by rewrite geq_max size_opp Hsize1 Hsize2.
   }
   apply /eqP.
@@ -264,7 +264,7 @@ Proof.
   apply: Hsize.
   replace (size pts) with (size (unzip1 (pts))).
   2: by rewrite size_map.
-  apply max_poly_roots => //.
+  apply: max_poly_roots => //.
   apply /allP => x' /mapP [[x y] Hin Heq].
   subst.
   rewrite /root hornerD hornerN.
@@ -273,7 +273,7 @@ Proof.
   by rewrite GRing.subr_eq0 eq_refl.
 Qed.
 
-(*
+(**
   We also prove some useful properties for how Lagrange polynomials behave when
   added or subtracted, specifically with regards to points with [y = 0], which
   are defined by [zero_points].
@@ -302,7 +302,7 @@ Proof.
   rewrite in_cons.
   rewrite map_cons in_cons xpair_eqE in H.
   destruct (x == a) eqn:Heq => //=.
-  by apply IHs.
+  by apply: IHs.
 Qed.
 
 Lemma y_in_zero_points {R: ringType} {x y: R} {s: seq R}:
@@ -315,7 +315,7 @@ Proof.
   destruct ((x, y) == (a, 0)) eqn:Heq.
   - move /eqP in Heq.
     by case: Heq.
-  - by apply IHs.
+  - by apply: IHs.
 Qed.
 
 Lemma pt_in_zero_points {R: ringType} {x: R} {s: seq R}:
@@ -349,7 +349,7 @@ Proof.
     1: rewrite (lagrange_poly_correct a.1 a.2) ?GRing.subrr //.
     all: by rewrite -surjective_pairing mem_cat in_cons eq_refl Bool.orb_true_r.
   - rewrite -!cat_rcons -!cats1 in Huniq1 Huniq2*.
-    by apply IHr.
+    by apply: IHr.
 Qed.
 
 Lemma lagrange_sub_zero_cons {R: fieldType} (x y1 y2: R) (pts: seq (R * R)):
@@ -358,15 +358,15 @@ Lemma lagrange_sub_zero_cons {R: fieldType} (x y1 y2: R) (pts: seq (R * R)):
   lagrange_poly ((x, y1 - y2) :: zero_points (unzip1 pts)).
 Proof.
   move=> Huniq.
-  apply lagrange_poly_unique.
+  apply: lagrange_poly_unique.
   - by rewrite /unzip1 map_cons -/unzip1 unzip1_zero_points.
   - apply: leq_trans.
-    1: by apply size_add.
+    1: by apply: size_add.
     rewrite size_opp /= !size_map geq_max.
     apply /andP.
     split.
     all: apply: leq_trans.
-    1,3: by apply size_lagrange_poly.
+    1,3: by apply: size_lagrange_poly.
     all: by [].
   - move=> x0 y0 Hin.
     rewrite in_cons in Hin.
@@ -379,8 +379,8 @@ Proof.
       all: by rewrite in_cons eq_refl.
     + rewrite (y_in_zero_points Hin).
       rewrite -!(cat1s _ pts).
-      apply lagrange_sub_zero => //.
-      by apply (x_in_zero_points x0 y0).
+      apply: lagrange_sub_zero => //.
+      by apply: (x_in_zero_points x0 y0).
 Qed.
 
 Lemma lagrange_add_zero {R: fieldType} (x: R) (l1 l2: seq (R * R)) (r: seq R):
@@ -400,7 +400,7 @@ Proof.
     1: rewrite (lagrange_poly_correct a 0) ?GRing.addr0 //.
     all: by rewrite mem_cat in_cons eq_refl Bool.orb_true_r.
   - rewrite -!cat_rcons -!cats1 in Huniq1 Huniq2*.
-    by apply IHr.
+    by apply: IHr.
 Qed.
 
 Lemma lagrange_add_zero_cons {R: fieldType} (x y1 y2: R) (s: seq R):
@@ -410,15 +410,15 @@ Lemma lagrange_add_zero_cons {R: fieldType} (x y1 y2: R) (s: seq R):
   lagrange_poly ((x, y1 + y2) :: zero_points s).
 Proof.
   move=> Huniq.
-  apply lagrange_poly_unique.
+  apply: lagrange_poly_unique.
   - by rewrite /unzip1 map_cons -/unzip1 unzip1_zero_points.
   - apply: leq_trans.
-    1: by apply size_add.
+    1: by apply: size_add.
     rewrite /= !size_map geq_max.
     apply /andP.
     split.
     all: apply: leq_trans.
-    1,3: by apply size_lagrange_poly.
+    1,3: by apply: size_lagrange_poly.
     all: by rewrite /= size_map.
   - move=> x0 y0 Hin.
     rewrite in_cons in Hin.
@@ -432,8 +432,8 @@ Proof.
       all: by rewrite /unzip1 map_cons -/unzip1 unzip1_zero_points.
     + rewrite (y_in_zero_points Hin).
       rewrite -!(cat1s _ (zero_points s)).
-      apply lagrange_add_zero.
-      3: by apply (x_in_zero_points x0 y0).
+      apply: lagrange_add_zero.
+      3: by apply: (x_in_zero_points x0 y0).
       all: by rewrite /unzip1 map_cons -/unzip1 unzip1_zero_points.
 Qed.
 
@@ -443,7 +443,7 @@ Lemma lagrange_zero {R: fieldType} (s: seq R):
 Proof.
   move=> Huniq.
   symmetry.
-  apply lagrange_poly_unique.
+  apply: lagrange_poly_unique.
   - by rewrite unzip1_zero_points.
   - by rewrite polyseq0.
   - move=> x y Hin.
@@ -451,7 +451,7 @@ Proof.
     by rewrite (y_in_zero_points Hin).
 Qed.
 
-(*
+(**
   We also define some functions that lets us treat polynomials like lists ending
   in infinite zeroes, and prove some useful lemmas that they do indeed behave
   like lists.
@@ -490,13 +490,13 @@ Lemma last_neq_0 {R: ringType} (a: R) (s: seq R):
   (last a s != 0 -> last 1 s != 0).
 Proof.
   case: s => H //=.
-  by apply GRing.oner_neq0.
+  by apply: GRing.oner_neq0.
 Qed.
 
 Lemma cons_head_tail_poly {R: ringType} (q: {poly R}):
   cons_poly (head_poly q) (tail_poly q) = q.
 Proof.
-  apply poly_inj.
+  apply: poly_inj.
   rewrite /head_poly /tail_poly polyseq_cons.
   case: q => [[|a s] /= Hs].
   1: by rewrite polyseq0.
@@ -513,7 +513,7 @@ Proof.
   by rewrite H cons_head_tail_poly.
 Qed.
 
-(*
+(**
   We also prove two polynomials are equal if, and only if, all their
   coefficients are equal.
   This is then used to prove how [tail_poly] and [cons_poly] behaves when added
@@ -524,7 +524,7 @@ Lemma coef_poly_eq {R: ringType} (q1 q2: {poly R}):
 Proof.
   split=> H.
   2: by rewrite H.
-  apply poly_inj.
+  apply: poly_inj.
   move: H.
   case: q2.
   case: q1.
@@ -544,10 +544,10 @@ Proof.
     simpl in *.
     rewrite H.
     f_equal.
-    apply IHs1 => //.
+    apply: IHs1 => //.
     all: apply: last_neq_0.
-    + by apply Hs1.
-    + by apply Hs2.
+    + by apply: Hs1.
+    + by apply: Hs2.
 Qed.
 
 Lemma tail_poly_add {R: ringType} (q1 q2: {poly R}):
@@ -575,18 +575,19 @@ Qed.
 
 Local Open Scope nat_scope.
 
-(*
+(**
   With the work on polynomials out of the way we can start to actually define
   the scheme.
 *)
 Section ShamirSecretSharing_example.
 
-(* [p] is the number of possible messages. It is is a [prime]. *)
+(**
+  [p] is the number of possible messages. It is is a [prime]. *)
 Variable (p: nat).
 
 Context (p_prime: prime p).
 
-(*
+(**
   We have to use [(Zp_trunc (pdiv p)).+2] for [Words] to be considered a field.
   This is important for uniqueness of Lagrange polynomials.
 *)
@@ -596,10 +597,12 @@ Definition Words := 'fin Words_N.
 Lemma words_p_eq:
   Words_N = p.
 Proof.
-  by apply Fp_cast.
+  by apply: Fp_cast.
 Qed.
 
-(* Shares are simply a point in ['F_p], i.e. a pair. *)
+(**
+  Shares are simply a point in ['F_p], i.e. a pair.
+*)
 Definition Share: choice_type := Words × Words.
 
 Notation " 'word " := (Words) (in custom pack_type at level 2).
@@ -608,7 +611,7 @@ Notation " 'word " := (Words) (at level 2): package_scope.
 Notation " 'share " := (Share) (in custom pack_type at level 2).
 Notation " 'share " := (Share) (at level 2): package_scope.
 
-(*
+(**
   We can't use sequences directly in [choice_type] so instead we use a map from
   natural numbers to the type.
 *)
@@ -617,13 +620,7 @@ Definition chSeq t := chMap 'nat t.
 Notation " 'seq t " := (chSeq t) (in custom pack_type at level 2).
 Notation " 'seq t " := (chSeq t) (at level 2): package_scope.
 
-Definition seq_to_map {T} (u: seq T): {fmap nat -> T} :=
-  mkfmap (zip (iota 0 (size u)) u).
-
-Definition map_to_seq {T} (m: {fmap nat -> T}): seq T :=
-  pmap m (domm m).
-
-(*
+(**
   We can't use sets directly in [choice_type] so instead we use a map to units.
   We can then use [domm] to get the domain, which is a set.
 *)
@@ -632,17 +629,19 @@ Definition chSet t := chMap t 'unit.
 Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
 Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
-(*
+(**
   [n] is the number of shares.
   It is always positive.
 *)
 Variable (n: nat).
 Context (n_positive: Positive n).
 
-(* We cannot possibly have more than [p-1] shares. *)
+(**
+  We cannot possibly have more than [p-1] shares.
+*)
 Context (n_ltn_p: n < p).
 
-(*
+(**
   Each party gets a share.
   We use a finity type to represent parties as it makes later proofs easier.
 *)
@@ -651,32 +650,34 @@ Definition Party := 'fin n.
 Notation " 'party " := (Party) (in custom pack_type at level 2).
 Notation " 'party " := (Party) (at level 2): package_scope.
 
-(* The share of each party is the point with [x = 1 + the party index]. *)
+(**
+  The share of each party is the point with [x = 1 + the party index].
+*)
 #[program]
 Definition party_to_word (x: Party): Words := @Ordinal _ x.+1 _.
 Next Obligation.
   case: x => [x Hx] /=.
   rewrite words_p_eq.
   apply: leq_trans.
-  2: by apply n_ltn_p.
+  2: by apply: n_ltn_p.
   by rewrite ltnS.
 Qed.
 
-(*
+(**
   Finally we can define how actual shares are computed.
   They are simply points on a polynomial [q].
 *)
 Definition make_share (q: {poly Words}) (x: Party): Share :=
   (party_to_word x, q.[party_to_word x]).
 
-(*
+(**
   This is a convenience function for computing the shares for a message [m].
   [q] is a randomly sampled polynomial.
 *)
 Definition make_shares (m: Words) (q: {poly Words}) (u: seq Party): seq Share :=
   map (make_share (cons_poly m q)) u.
 
-(*
+(**
   In order to prove security in SSProve we need to define a bijection
   The bijection between polynomials works like this:
   1. We compute the shares for the parties [u], message [m] and random
@@ -713,13 +714,13 @@ Lemma size_poly_bij {t: nat} (u: seq Party) (m m': Words) (q: {poly Words}):
 Proof.
   move=> Hu Hq.
   apply: leq_trans.
-  1: by apply size_add.
+  1: by apply: size_add.
   rewrite geq_max.
   apply /andP.
   split => //.
   rewrite size_tail_poly leq_pred_S.
   apply: leq_trans.
-  1: by apply size_add.
+  1: by apply: size_add.
   rewrite geq_max.
   apply /andP.
   split.
@@ -831,7 +832,7 @@ Proof.
   by rewrite /Positive expn_gt0 prime_gt0.
 Qed.
 
-(*
+(**
   [PolyEnc] is an isomorphism we use to be able to represent polynomials in SSProve.
   SSProve does not support using polynomials directly.
   There are [p^t] polynomials of size [<= t] over the field ['F_p].
@@ -855,7 +856,7 @@ Qed.
 Lemma mod_p_muln_p (a: nat) (m: Words):
   mod_p (a * p + m) = m.
 Proof.
-  apply ord_inj => /=.
+  apply: ord_inj => /=.
   by rewrite modnMDl -words_p_eq modn_small.
 Qed.
 
@@ -885,7 +886,7 @@ Lemma size_poly_to_nat (t: nat) (q: {poly Words}):
   poly_to_nat t q < p^t.
 Proof.
   elim: t => [// | t IHt] /= in q*.
-  apply (@leq_trans (poly_to_nat t (tail_poly q) * p + p)).
+  apply: (@leq_trans (poly_to_nat t (tail_poly q) * p + p)).
   2: by rewrite expnSr -mulSnr leq_pmul2r // prime_gt0.
   case: (head_poly q) => a Ha /=.
   by rewrite ltn_add2l -words_p_eq.
@@ -923,7 +924,7 @@ Proof.
   by destruct (size q).
 Qed.
 
-(*
+(**
   [t] is the number of shares needed for reconstruction.
   [t'] is the maximum number of shares the scheme is secure against. This
   happens to often be the number we actually care about so we will frequently
@@ -932,14 +933,14 @@ Qed.
 Variable (t': nat).
 Definition t := t'.+1.
 
-(*
+(**
   This is the final bijection used to
 *)
 #[program]
 Definition share_bij (u: seq Party) (m m': Words) (c: PolyEnc t'): PolyEnc t' :=
   @Ordinal _ (poly_to_nat t' (poly_bij u m m' (nat_to_poly t' c))) _.
 Next Obligation.
-  by apply size_poly_to_nat.
+  by apply: size_poly_to_nat.
 Qed.
 
 Lemma sec_share_bij (u: seq Party) (m m': Words) (c: PolyEnc t'):
@@ -950,7 +951,7 @@ Lemma sec_share_bij (u: seq Party) (m m': Words) (c: PolyEnc t'):
 Proof.
   move=> Huniq Hltn.
   rewrite /share_bij /= poly_nat_poly ?size_poly_bij ?size_nat_to_poly //.
-  by apply sec_poly_bij.
+  by apply: sec_poly_bij.
 Qed.
 
 Lemma bij_share_bij (u: seq Party) (m m': Words):
@@ -960,7 +961,7 @@ Lemma bij_share_bij (u: seq Party) (m m': Words):
 Proof.
   move=> Huniq Hleq.
   exists (share_bij u m' m) => q.
-  all: apply ord_inj.
+  all: apply: ord_inj.
   all: rewrite /= poly_nat_poly ?size_poly_bij ?size_nat_to_poly //.
   all: by rewrite bij_poly_bij ?nat_poly_nat.
 Qed.
@@ -970,7 +971,7 @@ Local Open Scope package_scope.
 Definition share_m: nat := 0.
 Definition share_lr: nat := 1.
 
-(*
+(**
   Then finally, we can define the packages and prove security of the protocol.
   This part is fairly easy now that we have a bijection.
 *)
@@ -983,7 +984,7 @@ Definition TSSS_pkg_tt:
       else
       q <$ uniform (p^t') ;;
       let sh := make_shares mr (nat_to_poly t' q) (domm u) in
-      ret (seq_to_map sh)
+      ret (fmap_of_seq sh)
     }
   ].
 
@@ -996,7 +997,7 @@ Definition TSSS_pkg_ff:
       else
       q <$ uniform (p^t') ;;
       let sh := make_shares ml (nat_to_poly t' q) (domm u) in
-      ret (seq_to_map sh)
+      ret (fmap_of_seq sh)
     }
   ].
 
@@ -1034,7 +1035,7 @@ Definition SHARE_pkg_tt:
       else
       q <$ uniform (p^t') ;;
       let sh := make_shares m (nat_to_poly t' q) (domm u) in
-      ret (seq_to_map sh)
+      ret (fmap_of_seq sh)
     }
   ].
 
@@ -1049,7 +1050,7 @@ Definition SHARE_pkg_ff:
       m' <$ uniform Words_N ;;
       q <$ uniform (p^t') ;;
       let sh := make_shares m' (nat_to_poly t' q) (domm u) in
-      ret (seq_to_map sh)
+      ret (fmap_of_seq sh)
     }
   ].
 
@@ -1063,97 +1064,102 @@ Definition SHARE := mkpair SHARE_pkg_tt SHARE_pkg_ff.
 Lemma TSSS_HYB_equiv_tt:
   TSSS true ≈₀ (TSSS_HYB_pkg_tt ∘ SHARE true).
 Proof.
-  apply eq_rel_perf_ind_eq.
-  simplify_eq_rel m;
-    apply rpost_weaken_rule with eq;
-    try by intros [] [] e; case: e.
+  apply: eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  all: apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case: m => ml [mr u].
   simplify_linking.
   simplify_linking.
   rewrite cast_fun_K.
   ssprove_code_simpl.
-  by apply rreflexivity_rule.
+  by apply: rreflexivity_rule.
 Qed.
 
-(* This corresponds to Lemma 3.12 from "The Joy of Cryptography". *)
+(**
+  This corresponds to Lemma 3.12 from "The Joy of Cryptography".
+*)
 Lemma SHARE_equiv:
   SHARE true ≈₀ SHARE false.
 Proof.
-  apply eq_rel_perf_ind_eq.
-  simplify_eq_rel m;
-    apply rpost_weaken_rule with eq;
-    try by intros [] [] e; case: e.
+  apply: eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  all: apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case: m => m u.
   destruct (t <= size _) eqn:Heq.
-  1: by apply rreflexivity_rule.
+  1: by apply: rreflexivity_rule.
   apply negbT in Heq.
   rewrite -ltnNge ltnS in Heq.
-  apply r_const_sample_R => //.
-  1: by apply LosslessOp_uniform.
+  apply: r_const_sample_R => //.
+  1: by apply: LosslessOp_uniform.
   move=> m'.
   apply: r_uniform_bij.
   1: {
-    apply (bij_share_bij (domm u) m m'), Heq.
-    by apply uniq_fset.
+    apply: (bij_share_bij (domm u) m m').
+    - by apply: uniq_fset.
+    - by apply: Heq.
   }
   move=> q.
   rewrite sec_share_bij //.
   2: by rewrite uniq_fset.
-  by apply rreflexivity_rule.
+  by apply: rreflexivity_rule.
 Qed.
 
 Lemma TSSS_HYB_equiv:
   (TSSS_HYB_pkg_tt ∘ SHARE false) ≈₀ (TSSS_HYB_pkg_ff ∘ SHARE false).
 Proof.
-  apply eq_rel_perf_ind_eq.
-  simplify_eq_rel m;
-    apply rpost_weaken_rule with eq;
-    try by intros [] [] e; case: e.
+  apply: eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  all: apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case: m => ml [mr u].
   simplify_linking.
   simplify_linking.
   rewrite cast_fun_K.
   ssprove_code_simpl.
-  by apply rreflexivity_rule.
+  by apply: rreflexivity_rule.
 Qed.
 
 Lemma TSSS_HYB_equiv_ff:
   (TSSS_HYB_pkg_ff ∘ SHARE true) ≈₀ TSSS false.
 Proof.
-  apply eq_rel_perf_ind_eq.
-  simplify_eq_rel m;
-    apply rpost_weaken_rule with eq;
-    try by intros [] [] e; case: e.
+  apply: eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  all: apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case: m => ml [mr u].
   simplify_linking.
   simplify_linking.
   rewrite cast_fun_K.
   ssprove_code_simpl.
-  by apply rreflexivity_rule.
+  by apply: rreflexivity_rule.
 Qed.
 
-(* This corresponds to Theorem 3.13 from "The Joy of Cryptography". *)
+(**
+  This corresponds to Theorem 3.13 from "The Joy of Cryptography".
+*)
 Theorem unconditional_secrecy LA A:
   ValidPackage LA
-    [interface #val #[share_lr] : 'word × 'word × 'set 'party → 'seq 'share ] A_export A ->
+    [interface #val #[share_lr]: 'word × 'word × 'set 'party → 'seq 'share ] A_export A ->
   Advantage TSSS A = 0%R.
 Proof.
-  intros vA.
-  rewrite Advantage_E.
-  rewrite Advantage_sym.
+  move=> vA.
+  rewrite Advantage_E Advantage_sym.
   ssprove triangle (TSSS true) [::
     TSSS_HYB_pkg_tt ∘ SHARE true  ;
     TSSS_HYB_pkg_tt ∘ SHARE false ;
     TSSS_HYB_pkg_ff ∘ SHARE false ;
     TSSS_HYB_pkg_ff ∘ SHARE true
   ] (TSSS false) A as ineq.
-  rewrite TSSS_HYB_equiv_tt ?GRing.add0r ?fsetU0 ?fdisjoints0 // in ineq.
-  rewrite TSSS_HYB_equiv    ?GRing.addr0 ?fsetU0 ?fdisjoints0 // in ineq.
-  rewrite TSSS_HYB_equiv_ff ?GRing.addr0 ?fsetU0 ?fdisjoints0 // in ineq.
-  rewrite (Advantage_sym (_ ∘ SHARE false)) in ineq.
-  rewrite -!Advantage_link in ineq.
-  rewrite !SHARE_equiv ?GRing.add0r ?fsetU0 ?fdisjoints0 // in ineq.
-  by apply AdvantageE_le_0.
+  apply: AdvantageE_le_0.
+  apply: le_trans.
+  1: by apply: ineq.
+  rewrite -!Advantage_link (Advantage_sym (SHARE false)).
+  rewrite TSSS_HYB_equiv_tt ?fsetU0 ?fdisjoints0 // GRing.add0r.
+  rewrite TSSS_HYB_equiv    ?fsetU0 ?fdisjoints0 // GRing.addr0.
+  rewrite TSSS_HYB_equiv_ff ?fsetU0 ?fdisjoints0 // GRing.addr0.
+  by rewrite !SHARE_equiv ?fsetU0 ?fdisjoints0 // GRing.add0r.
 Qed.
 
 End ShamirSecretSharing_example.
