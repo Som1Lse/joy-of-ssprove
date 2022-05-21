@@ -179,7 +179,7 @@ Definition prg_epsilon := Advantage PRG1.
 Theorem security_based_on_prf LA A:
   ValidPackage LA
     [interface #val #[query]: 'unit → 'word × 'word × 'word ]
-      A_export A ->
+    A_export A ->
   Advantage PRG2 A <=
   prg_epsilon (A ∘ PRG2_HYB_pkg_1) +
   prg_epsilon (A ∘ PRG2_HYB_pkg_2).
