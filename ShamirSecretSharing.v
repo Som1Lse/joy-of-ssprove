@@ -21,8 +21,10 @@
 
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
-  ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq poly.
+  ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq.
+Set Warnings "notation-overridden,ambiguous-paths".
 
 From Mon Require Import SPropBase.
 From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
@@ -588,14 +590,14 @@ Variable (p: nat).
 Context (p_prime: prime p).
 
 (**
-  We have to use [(Zp_trunc (pdiv p)).+2] for [Words] to be considered a field.
+  We have to use [(Zp_trunc (pdiv p)).+2] for [Word] to be considered a field.
   This is important for uniqueness of Lagrange polynomials.
 *)
-Definition Words_N := (Zp_trunc (pdiv p)).+2.
-Definition Words := 'fin Words_N.
+Definition Word_N := (Zp_trunc (pdiv p)).+2.
+Definition Word := 'fin Word_N.
 
 Lemma words_p_eq:
-  Words_N = p.
+  Word_N = p.
 Proof.
   by apply: Fp_cast.
 Qed.
@@ -603,10 +605,10 @@ Qed.
 (**
   Shares are simply a point in ['F_p], i.e. a pair.
 *)
-Definition Share: choice_type := Words × Words.
+Definition Share: choice_type := Word × Word.
 
-Notation " 'word " := (Words) (in custom pack_type at level 2).
-Notation " 'word " := (Words) (at level 2): package_scope.
+Notation " 'word " := (Word) (in custom pack_type at level 2).
+Notation " 'word " := (Word) (at level 2): package_scope.
 
 Notation " 'share " := (Share) (in custom pack_type at level 2).
 Notation " 'share " := (Share) (at level 2): package_scope.
@@ -654,7 +656,7 @@ Notation " 'party " := (Party) (at level 2): package_scope.
   The share of each party is the point with [x = 1 + the party index].
 *)
 #[program]
-Definition party_to_word (x: Party): Words := @Ordinal _ x.+1 _.
+Definition party_to_word (x: Party): Word := @Ordinal _ x.+1 _.
 Next Obligation.
   case: x => [x Hx] /=.
   rewrite words_p_eq.
@@ -667,14 +669,14 @@ Qed.
   Finally we can define how actual shares are computed.
   They are simply points on a polynomial [q].
 *)
-Definition make_share (q: {poly Words}) (x: Party): Share :=
+Definition make_share (q: {poly Word}) (x: Party): Share :=
   (party_to_word x, q.[party_to_word x]).
 
 (**
   This is a convenience function for computing the shares for a message [m].
   [q] is a randomly sampled polynomial.
 *)
-Definition make_shares (m: Words) (q: {poly Words}) (u: seq Party): seq Share :=
+Definition make_shares (m: Word) (q: {poly Word}) (u: seq Party): seq Share :=
   map (make_share (cons_poly m q)) u.
 
 (**
@@ -694,7 +696,7 @@ Definition make_shares (m: Words) (q: {poly Words}) (u: seq Party): seq Share :=
 
   [sec_poly_bij] and [bij_poly_bij] simply formalise the above intuitions.
 *)
-Definition poly_bij (u: seq Party) (m m': Words) (q: {poly Words}): {poly Words} :=
+Definition poly_bij (u: seq Party) (m m': Word) (q: {poly Word}): {poly Word} :=
   let sh := make_shares m q u in
   let qm  := lagrange_poly ((0%R, m ) :: sh) in
   let qm' := lagrange_poly ((0%R, m') :: sh) in
@@ -707,7 +709,7 @@ Proof.
   by case: a.
 Qed.
 
-Lemma size_poly_bij {t: nat} (u: seq Party) (m m': Words) (q: {poly Words}):
+Lemma size_poly_bij {t: nat} (u: seq Party) (m m': Word) (q: {poly Word}):
   size u <= t ->
   size q <= t ->
   size (poly_bij u m m' q) <= t.
@@ -729,13 +731,13 @@ Proof.
   all: by rewrite /= size_map.
 Qed.
 
-Lemma no_zero_share (u: seq Party) (m: Words) (q: {poly Words}):
+Lemma no_zero_share (u: seq Party) (m: Word) (q: {poly Word}):
   0%R \notin unzip1 (make_shares m q u).
 Proof.
   by elim: u.
 Qed.
 
-Lemma in_make_shares (x: Party) (u: seq Party) (m: Words) (q: {poly Words}):
+Lemma in_make_shares (x: Party) (u: seq Party) (m: Word) (q: {poly Word}):
   (party_to_word x \in unzip1 (make_shares m q u)) = (x \in u).
 Proof.
   elim: u => [// | b u IHu] /=.
@@ -746,7 +748,7 @@ Proof.
   - by rewrite in_cons -val_eqE eqSS val_eqE Heq.
 Qed.
 
-Lemma uniq_make_shares (u: seq Party) (m: Words) (q: {poly Words}):
+Lemma uniq_make_shares (u: seq Party) (m: Word) (q: {poly Word}):
   uniq u ->
   uniq (unzip1 (make_shares m q u)).
 Proof.
@@ -755,14 +757,14 @@ Proof.
   by rewrite IHu // in_make_shares H1.
 Qed.
 
-Lemma make_shares_same_x (m m': Words) (u: seq Party) (q: {poly Words}):
+Lemma make_shares_same_x (m m': Word) (u: seq Party) (q: {poly Word}):
   unzip1 (make_shares m' q u) = unzip1 (make_shares m q u).
 Proof.
   elim: u => [// | a u IHu] /=.
   by rewrite IHu.
 Qed.
 
-Lemma sec_poly_bij_part (x: Party) (u: seq Party) (m m': Words) (q: {poly Words}):
+Lemma sec_poly_bij_part (x: Party) (u: seq Party) (m m': Word) (q: {poly Word}):
   uniq u ->
   x \in u ->
   (cons_poly m' (poly_bij u m m' q)).[party_to_word x] =
@@ -784,7 +786,7 @@ Proof.
   - by rewrite in_cons pt_in_zero_points ?Bool.orb_true_r // in_make_shares.
 Qed.
 
-Lemma sec_poly_bij_rec (l r: seq Party) (m m': Words) (q: {poly Words}):
+Lemma sec_poly_bij_rec (l r: seq Party) (m m': Word) (q: {poly Word}):
   uniq (l ++ r) ->
   make_shares m' (poly_bij (l ++ r) m m' q) r =
   make_shares m                          q  r.
@@ -796,7 +798,7 @@ Proof.
   by rewrite mem_cat cats1 mem_rcons in_cons eq_refl.
 Qed.
 
-Lemma sec_poly_bij (u: seq Party) (m m': Words) (q: {poly Words}):
+Lemma sec_poly_bij (u: seq Party) (m m': Word) (q: {poly Word}):
   uniq u ->
   make_shares m' (poly_bij u m m' q) u =
   make_shares m                   q  u.
@@ -805,7 +807,7 @@ Proof.
   by rewrite (sec_poly_bij_rec [::]).
 Qed.
 
-Lemma bij_poly_bij (u: seq Party) (m m': Words) (q: {poly Words}):
+Lemma bij_poly_bij (u: seq Party) (m m': Word) (q: {poly Word}):
   uniq u ->
   poly_bij u m' m (poly_bij u m m' q) = q.
 Proof.
@@ -847,26 +849,26 @@ Qed.
 *)
 Definition PolyEnc t := 'fin (p^t).
 
-#[program] Definition mod_p (a: nat): Words :=
+#[program] Definition mod_p (a: nat): Word :=
   @Ordinal _ (a %% p) _.
 Next Obligation.
   by rewrite words_p_eq ltn_mod prime_gt0.
 Qed.
 
-Lemma mod_p_muln_p (a: nat) (m: Words):
+Lemma mod_p_muln_p (a: nat) (m: Word):
   mod_p (a * p + m) = m.
 Proof.
   apply: ord_inj => /=.
   by rewrite modnMDl -words_p_eq modn_small.
 Qed.
 
-Fixpoint nat_to_poly (t a: nat): {poly Words} :=
+Fixpoint nat_to_poly (t a: nat): {poly Word} :=
   match t with
   | 0 => 0%R
   | t'.+1 => cons_poly (mod_p a) (nat_to_poly t' (a %/ p))
   end.
 
-Fixpoint poly_to_nat (t: nat) (q: {poly Words}): nat :=
+Fixpoint poly_to_nat (t: nat) (q: {poly Word}): nat :=
   match t with
   | 0 => 0
   | t'.+1 => poly_to_nat t' (tail_poly q) * p + head_poly q
@@ -882,7 +884,7 @@ Proof.
   by rewrite ltnS.
 Qed.
 
-Lemma size_poly_to_nat (t: nat) (q: {poly Words}):
+Lemma size_poly_to_nat (t: nat) (q: {poly Word}):
   poly_to_nat t q < p^t.
 Proof.
   elim: t => [// | t IHt] /= in q*.
@@ -903,7 +905,7 @@ Proof.
   by rewrite ltn_divLR // prime_gt0.
 Qed.
 
-Lemma poly_nat_poly (t: nat) (q: {poly Words}):
+Lemma poly_nat_poly (t: nat) (q: {poly Word}):
   size q <= t ->
   nat_to_poly t (poly_to_nat t q) = q.
 Proof.
@@ -937,13 +939,13 @@ Definition t := t'.+1.
   This is the final bijection used to
 *)
 #[program]
-Definition share_bij (u: seq Party) (m m': Words) (c: PolyEnc t'): PolyEnc t' :=
+Definition share_bij (u: seq Party) (m m': Word) (c: PolyEnc t'): PolyEnc t' :=
   @Ordinal _ (poly_to_nat t' (poly_bij u m m' (nat_to_poly t' c))) _.
 Next Obligation.
   by apply: size_poly_to_nat.
 Qed.
 
-Lemma sec_share_bij (u: seq Party) (m m': Words) (c: PolyEnc t'):
+Lemma sec_share_bij (u: seq Party) (m m': Word) (c: PolyEnc t'):
   uniq u ->
   (size u <= t')%N ->
   make_shares m' (nat_to_poly t' (share_bij u m m' c)) u =
@@ -954,7 +956,7 @@ Proof.
   by apply: sec_poly_bij.
 Qed.
 
-Lemma bij_share_bij (u: seq Party) (m m': Words):
+Lemma bij_share_bij (u: seq Party) (m m': Word):
   uniq u ->
   (size u <= t')%N ->
   bijective (share_bij u m m').
@@ -1047,7 +1049,7 @@ Definition SHARE_pkg_ff:
     #def #[share_m] ('(m, u): 'word × 'set 'party): 'seq 'share {
       if size (domm u) >= t then ret emptym
       else
-      m' <$ uniform Words_N ;;
+      m' <$ uniform Word_N ;;
       q <$ uniform (p^t') ;;
       let sh := make_shares m' (nat_to_poly t' q) (domm u) in
       ret (fmap_of_seq sh)
@@ -1141,7 +1143,8 @@ Qed.
 *)
 Theorem unconditional_secrecy LA A:
   ValidPackage LA
-    [interface #val #[share_lr]: 'word × 'word × 'set 'party → 'seq 'share ] A_export A ->
+    [interface #val #[share_lr]: 'word × 'word × 'set 'party → 'seq 'share ]
+    A_export A ->
   Advantage TSSS A = 0%R.
 Proof.
   move=> vA.

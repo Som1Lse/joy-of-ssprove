@@ -1,13 +1,15 @@
 (**
   Really simply proof of Claim 5.5 from "The Joy of Cryptography" (p. 94).
 
-  It is really simple to follow, and the proof statement is basically complete.
+  It is simple and easy to follow.
 *)
 
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq.
+Set Warnings "notation-overridden,ambiguous-paths".
 
 From Mon Require Import SPropBase.
 From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
@@ -39,13 +41,13 @@ Definition tt := Datatypes.tt.
 
 Variable (n: nat).
 
-Definition Words_N: nat := 2^n.
-Definition Words: choice_type := 'fin Words_N.
+Definition Word_N: nat := 2^n.
+Definition Word: choice_type := 'fin Word_N.
 
-Notation " 'word " := (Words) (in custom pack_type at level 2).
-Notation " 'word " := (Words) (at level 2): package_scope.
+Notation " 'word " := (Word) (in custom pack_type at level 2).
+Notation " 'word " := (Word) (at level 2): package_scope.
 
-Context (PRG: Words -> Words * Words).
+Context (PRG: Word -> Word * Word).
 
 Definition query: nat := 0.
 
@@ -59,7 +61,7 @@ Definition PRG1_pkg_tt:
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
       #def #[query] (_: 'unit): 'word × 'word {
-        s <$ uniform Words_N ;;
+        s <$ uniform Word_N ;;
         ret (PRG s)
       }
   ].
@@ -70,9 +72,9 @@ Definition PRG1_pkg_ff:
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
       #def #[query] (_: 'unit): 'word × 'word {
-        s1 <$ uniform Words_N ;;
-        s2 <$ uniform Words_N ;;
-        ret (s1, s2)
+        r1 <$ uniform Word_N ;;
+        r2 <$ uniform Word_N ;;
+        ret (r1, r2)
       }
   ].
 
@@ -84,7 +86,7 @@ Definition PRG2_pkg_tt:
     [interface #val #[query]: 'unit → 'word × 'word × 'word ] :=
   [package
       #def #[query] (_: 'unit): 'word × 'word × 'word {
-        s <$ uniform Words_N ;;
+        s <$ uniform Word_N ;;
         let '(x, y) := PRG s in
         ret (x, PRG y)
       }
@@ -96,9 +98,9 @@ Definition PRG2_pkg_ff:
     [interface #val #[query]: 'unit → 'word × 'word × 'word ] :=
   [package
       #def #[query] (_: 'unit): 'word × 'word × 'word {
-        x <$ uniform Words_N ;;
-        u <$ uniform Words_N ;;
-        v <$ uniform Words_N ;;
+        x <$ uniform Word_N ;;
+        u <$ uniform Word_N ;;
+        v <$ uniform Word_N ;;
         ret (x, (u, v))
       }
   ].
@@ -125,7 +127,7 @@ Definition PRG2_HYB_pkg_2:
   [package
       #def #[query] (_: 'unit): 'word × 'word × 'word {
         #import {sig #[query]: 'unit → 'word × 'word } as query ;;
-        x <$ uniform Words_N ;;
+        x <$ uniform Word_N ;;
         uv ← query tt ;;
         ret (x, uv)
       }
@@ -175,13 +177,12 @@ Local Open Scope ring_scope.
 Definition prg_epsilon := Advantage PRG1.
 
 Theorem security_based_on_prf LA A:
-    ValidPackage LA
-      [interface
-        #val #[query]: 'unit → 'word × 'word × 'word ]
-        A_export A ->
-    Advantage PRG2 A <=
-    prg_epsilon (A ∘ PRG2_HYB_pkg_1) +
-    prg_epsilon (A ∘ PRG2_HYB_pkg_2).
+  ValidPackage LA
+    [interface #val #[query]: 'unit → 'word × 'word × 'word ]
+      A_export A ->
+  Advantage PRG2 A <=
+  prg_epsilon (A ∘ PRG2_HYB_pkg_1) +
+  prg_epsilon (A ∘ PRG2_HYB_pkg_2).
 Proof.
   move=> vA.
   rewrite Advantage_E Advantage_sym.

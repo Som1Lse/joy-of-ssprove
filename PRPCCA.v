@@ -1,20 +1,25 @@
 (**
   This formalises Claim 9.4 from "The Joy of Cryptography" (p. 172). It is a
-  CCA-secure scheme based on a Strong Pseudo-Random Permutation (SPRP).
+  CCA-secure scheme based on a Strong Pseudo-Random Permutation (SPRP). It is
+  significantly more complicated than MACCCA.v, but relies only on one,
+  somewhat low-level, cryptographic primitive.
 
   It shows how to do sampling without replacement in SSProve. It follows the
   proof from the book rather closely, with only a minor diversion (see
   [CTXT_HYB_pkg_2]), and most of the proofs are relatively easy to follow.
 
-  As with PRFMAC.v it shows the advantage is at most the sum of the [prp_epsilon] and a
-  [statistical_gap]. The first is negligible by assumption, the latter requires additional analysis
-  to prove, which is not yet supported by SSProve.
+  As with PRFMAC.v it shows the advantage is at most the sum of the
+  [prp_epsilon] and a [statistical_gap]. The first is negligible by assumption,
+  the latter requires additional analysis to prove, which is not yet supported
+  by SSProve.
 *)
 
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq.
+Set Warnings "notation-overridden,ambiguous-paths".
 
 From Mon Require Import SPropBase.
 From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
@@ -41,8 +46,6 @@ Import Num.Theory.
 Import Order.POrderTheory.
 
 Section PRPCCA_example.
-
-Set Equations Transparent.
 
 (**
   We can't use sets directly in [choice_type] so instead we use a map to units.
@@ -117,14 +120,14 @@ Definition samp_no_repl {n} `{Positive n} {L} (r: {fset ('fin n)}): code L [inte
 
 Variable (n l: nat).
 
-Definition Words_N: nat := 2^n.
-Definition Words: choice_type := 'fin Words_N.
+Definition Word_N: nat := 2^n.
+Definition Word: choice_type := 'fin Word_N.
 
 Definition Key_N: nat := 2^l.
 Definition Key: choice_type := 'fin Key_N.
 
 (**
-  Ciphertexts are technically a [Words * Key] pair, but since we want to be able
+  Ciphertexts are technically a [Word * Key] pair, but since we want to be able
   to sample random ciphertexts, we define them as [n+l]-bit integers.
 *)
 Definition Ciph_N: nat := 2^(n + l).
@@ -134,8 +137,8 @@ Definition Ciph: choice_type := 'fin Ciph_N.
   We can then define functions to convert between the two.
 *)
 #[program]
-Definition ciph_to_pair (c: Ciph): Words * Key :=
-  (@Ordinal _ (c %% Words_N) _, @Ordinal _ (c %/ Words_N) _).
+Definition ciph_to_pair (c: Ciph): Word * Key :=
+  (@Ordinal _ (c %% Word_N) _, @Ordinal _ (c %/ Word_N) _).
 Next Obligation.
   by rewrite ltn_mod PositiveExp2.
 Qed.
@@ -144,10 +147,10 @@ Next Obligation.
 Qed.
 
 #[program]
-Definition mkciph (m: Words) (r: Key): Ciph :=
-  @Ordinal _ (r * Words_N + m) _.
+Definition mkciph (m: Word) (r: Key): Ciph :=
+  @Ordinal _ (r * Word_N + m) _.
 Next Obligation.
-  apply: (@leq_trans (r * Words_N + Words_N)).
+  apply: (@leq_trans (r * Word_N + Word_N)).
   - by rewrite ltn_add2l.
   - by rewrite /Ciph_N expnD addnC -mulSn mulnC leq_pmul2l ?PositiveExp2.
 Qed.
@@ -160,7 +163,7 @@ Proof.
   by rewrite -divn_eq.
 Qed.
 
-Lemma ciph_to_pair_mkciph (m: Words) (r: Key):
+Lemma ciph_to_pair_mkciph (m: Word) (r: Key):
   ciph_to_pair (mkciph m r) = (m, r).
 Proof.
   rewrite /mkciph /ciph_to_pair /=.
@@ -170,7 +173,7 @@ Proof.
   - by rewrite divnMDl ?PositiveExp2 ?divn_small ?addn0.
 Qed.
 
-Lemma mkciph_eq (m m': Words) (r r': Key):
+Lemma mkciph_eq (m m': Word) (r r': Key):
   (mkciph m r == mkciph m' r') = (m == m') && (r == r').
 Proof.
   case: (eq_dec ((m == m') && (r == r')) true).
@@ -191,23 +194,8 @@ Qed.
 Context (PRP:  Key -> Ciph -> Ciph).
 Context (PRP': Key -> Ciph -> Ciph).
 
-(**
-  We don't use these in the security proof, but they are an essential part of
-  the definition of a SPRP.
-*)
-Context (Hcan: forall k, cancel (PRP k) (PRP' k)).
-Context (Hcan': forall k, cancel (PRP' k) (PRP k)).
-
-Lemma Hbij (k: Key):
-  bijective (PRP k).
-Proof.
-  exists (PRP' k).
-  - by apply: Hcan.
-  - by apply: Hcan'.
-Qed.
-
-Notation " 'word " := (Words) (in custom pack_type at level 2).
-Notation " 'word " := (Words) (at level 2): package_scope.
+Notation " 'word " := (Word) (in custom pack_type at level 2).
+Notation " 'word " := (Word) (at level 2): package_scope.
 
 Notation " 'key " := (Key) (in custom pack_type at level 2).
 Notation " 'key " := (Key) (at level 2): package_scope.
@@ -814,9 +802,9 @@ Proof.
       ssprove_sync=> c.
       ssprove_sync=> [|Tinv];
         first by rewrite in_fset1; apply /eqP.
-      ssprove_swap_seq_lhs [:: 1; 0]%N.
-      ssprove_swap_seq_rhs [:: 1; 0]%N.
-      ssprove_sync => [|S];
+      ssprove_swap_seq_lhs [:: 1; 0].
+      ssprove_swap_seq_rhs [:: 1; 0].
+      ssprove_sync=> [|S];
         first by rewrite in_fset1; apply /eqP.
       do 3 ssprove_sync.
       shelve.
@@ -871,7 +859,7 @@ Proof.
     ssprove_sync=> c.
     ssprove_sync=> [|Tinv];
       first by move=> ? ? ->.
-    ssprove_swap_seq_lhs [:: 1; 0]%N.
+    ssprove_swap_seq_lhs [:: 1; 0].
     ssprove_sync=> [|S];
       first by move=> ? ? ->.
     do 4 apply: r_put_vs_put.
@@ -920,11 +908,11 @@ Proof.
   all: ssprove_code_simpl.
   all: ssprove_code_simpl_more.
   all: apply: r_get_remember_lhs => R.
-  - ssprove_sync => r.
-    ssprove_sync => [|T];
+  - ssprove_sync=> r.
+    ssprove_sync=> [|T];
       first by rewrite in_fsetU !in_fset1; apply /norP; split; apply /eqP.
-    ssprove_sync => c.
-    ssprove_sync => [|Tinv];
+    ssprove_sync=> c.
+    ssprove_sync=> [|Tinv];
     first by rewrite in_fsetU !in_fset1; apply /norP; split; apply /eqP.
     ssprove_sync=> [|S];
       first by rewrite in_fsetU !in_fset1; apply /norP; split; apply /eqP.
@@ -1127,7 +1115,7 @@ Proof.
     }
     ssprove_sync=> c.
     apply: r_get_remember_rhs => T.
-    ssprove_swap_rhs 0%N.
+    ssprove_swap_rhs 0.
     ssprove_sync.
     apply: r_put_lhs.
     apply: r_put_rhs.
@@ -1177,8 +1165,7 @@ Local Open Scope ring_scope.
 Definition prp_epsilon := Advantage EVAL.
 
 (**
-  The advantage an adversary can gain in the [SAMP] (note [EVAL_SAMP] is also a
-  form of [SAMP], which is evident from the definition) games.
+  The advantage an adversary can gain in the [SAMP] games.
   This is negligible, but not yet provable in SSProve.
 *)
 Definition statistical_gap A :=
@@ -1190,7 +1177,8 @@ Theorem security_based_on_prp LA A:
   ValidPackage LA
     [interface
       #val #[ctxt]: 'word → 'ciph ;
-      #val #[decrypt]: 'ciph → 'word ] A_export A ->
+      #val #[decrypt]: 'ciph → 'word ]
+    A_export A ->
   fdisjoint LA (
     EVAL_locs_tt :|: EVAL_locs_ff :|: CTXT_locs :|:
     CTXT_EVAL_locs :|: CTXT_EVAL_SAMP_locs :|:

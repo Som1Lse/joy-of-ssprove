@@ -13,8 +13,10 @@
 
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq.
+Set Warnings "notation-overridden,ambiguous-paths".
 
 From Mon Require Import SPropBase.
 From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
@@ -44,8 +46,8 @@ Section SecretSharing_example.
 
 Variable (n: nat).
 
-Definition Words_N: nat := 2^n.
-Definition Words: choice_type := chFin (mkpos Words_N).
+Definition Word_N: nat := 2^n.
+Definition Word: choice_type := chFin (mkpos Word_N).
 
 (**
   The first bit is a formalisation of [plus] (XOR).
@@ -77,7 +79,7 @@ Proof.
     by apply: BinNat.N.lt_0_succ.
 Qed.
 
-#[program] Definition plus (w k: Words): Words :=
+#[program] Definition plus (w k: Word): Word :=
   @Ordinal _ (BinNat.N.to_nat (BinNat.N.lxor
     (BinNat.N.of_nat (nat_of_ord w))
     (BinNat.N.of_nat (nat_of_ord k)))) _.
@@ -133,8 +135,8 @@ Qed.
 
 #[local] Open Scope package_scope.
 
-Notation " 'word " := ('fin (2^n)%N) (in custom pack_type at level 2).
-Notation " 'word " := ('fin (2^n)%N) (at level 2): package_scope.
+Notation " 'word " := (Word) (in custom pack_type at level 2).
+Notation " 'word " := (Word) (at level 2): package_scope.
 
 Definition chSeq t := chMap 'nat t.
 
@@ -150,17 +152,17 @@ Definition chSet t := chMap t 'unit.
 Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
 Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
-Definition share (m: Words):
+Definition share (m: Word):
   code fset0
     [interface]
     (chMap 'nat 'word) :=
   {code
-    s0 <$ uniform Words_N ;;
+    s0 <$ uniform Word_N ;;
     let s1 := s0 ⊕ m in
     ret [fmap (0, s0) ; (1, s0 ⊕ m)]
   }.
 
-Definition reconstruct (s0 s1: Words):
+Definition reconstruct (s0 s1: Word):
   code fset0
     [interface]
     'fin (2^n) :=
@@ -201,10 +203,10 @@ Definition TSSS_HYB_pkg_tt:
     #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
       match FSet.fsval (domm u) with
       | [:: 0] =>
-        s0 <$ uniform Words_N ;;
+        s0 <$ uniform Word_N ;;
         ret (fmap_of_seq [:: s0])
       | [:: 1] =>
-        s0 <$ uniform Words_N ;;
+        s0 <$ uniform Word_N ;;
         s1 ← ret (s0 ⊕ mr) ;;
         ret (fmap_of_seq [:: s1])
       | _ => ret emptym
@@ -219,10 +221,10 @@ Definition TSSS_HYB_pkg_ff:
     #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
       match FSet.fsval (domm u) with
       | [:: 0] =>
-        s0 <$ uniform Words_N ;;
+        s0 <$ uniform Word_N ;;
         ret (fmap_of_seq [:: s0])
       | [:: 1] =>
-        s0 <$ uniform Words_N ;;
+        s0 <$ uniform Word_N ;;
         s1 ← ret (s0 ⊕ ml) ;;
         ret (fmap_of_seq [:: s1])
       | _ => ret emptym
@@ -277,7 +279,7 @@ Proof.
   2: by apply: rreflexivity_rule.
   case: a => [|[|?]].
   1,3: by apply: rreflexivity_rule.
-  pose (f := fun (m: Words) => m ⊕ (ml ⊕ mr)).
+  pose (f := fun (m: Word) => m ⊕ (ml ⊕ mr)).
   assert (bij_f: bijective f).
   {
     subst f.
@@ -319,7 +321,8 @@ Qed.
 
 Theorem unconditional_secrecy LA A:
   ValidPackage LA
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] A_export A ->
+    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ]
+    A_export A ->
   Advantage TSSS A = 0%R.
 Proof.
   move=> vA.
