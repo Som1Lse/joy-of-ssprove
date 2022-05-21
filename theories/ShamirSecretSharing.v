@@ -864,7 +864,7 @@ Qed.
 
 Fixpoint nat_to_poly (t a: nat): {poly Word} :=
   match t with
-  | 0 => 0%R
+  | 0 => 0
   | t'.+1 => cons_poly (mod_p a) (nat_to_poly t' (a %/ p))
   end.
 

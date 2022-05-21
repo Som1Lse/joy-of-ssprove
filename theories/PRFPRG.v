@@ -1,5 +1,11 @@
 (**
-  TODO: Claim 6.3 from "The Joy of Cryptography" (p. 111).
+  This formalises Claim 6.3 from "The Joy of Cryptography" (p. 111).
+  It shows how to work with variable length proofs.
+
+  It is fairly complete. One thing that is missing is the final step, which is
+  proving the last hybrid is perfectly indistinguishable from [PRG false],
+  which, to my knowledge, cannot (yet) be formalised in SSProve, so instead we
+  make it a hypothesis of the final statement [security_based_on_prf].
 *)
 
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
@@ -153,11 +159,14 @@ Definition PRG := mkpair PRG_pkg_tt PRG_pkg_ff.
 Definition HYB_locs := fset [:: count_location ].
 
 (**
-  We diverge slightly from the book here: The first hybrid is [HYB_pkg_tt 0]
-  rather than [HYB_pkg_tt 1]. This makes the proofs simpler, since all choices
-  of [i] are valid.
+  Defining the hybrid proofs is surprisingly simple: We can just take [i] as a
+  parameter, and we can use it in the package.
+
+  We diverge slightly from the book: The first hybrid is [HYB_pkg 0] rather
+  than [HYB_pkg 1]. This makes the proofs simpler, since all choices of [i]
+  are valid.
 *)
-Definition HYB_pkg_tt i:
+Definition HYB_pkg i:
   package HYB_locs
     [interface]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
@@ -175,7 +184,7 @@ Definition HYB_pkg_tt i:
       }
   ].
 
-Definition HYB_pkg_ff i:
+Definition HYB_EVAL_pkg i:
   package HYB_locs
     [interface #val #[lookup]: 'word → 'word ]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
@@ -210,7 +219,7 @@ Definition EVAL_HYB_pkg:
   ].
 
 Lemma PRG_equiv_true:
-  PRG true ≈₀ HYB_pkg_tt 0.
+  PRG true ≈₀ HYB_pkg 0.
 Proof.
   apply eq_rel_perf_ind_ignore with (fset1 count_location).
   1: by rewrite /HYB_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
@@ -225,23 +234,17 @@ Proof.
   by rewrite get_set_heap_neq ?Hinv // -in_fset1.
 Qed.
 
-Lemma PRG_HYB_equiv_0:
-  HYB_pkg_tt 0 ≈₀ HYB_pkg_tt 0.
-Proof.
-  apply: eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
-    last by move=> [? ?] [? ?] [].
-  by apply: rreflexivity_rule.
-Qed.
-
-Lemma PRG_HYB_equiv_true i:
-  HYB_pkg_tt i ≈₀ HYB_pkg_ff i ∘ EVAL true.
+(**
+  The proofs are fairly simple. The main trick is to realise that [k] is
+  uninitialised when [count <= i].
+*)
+Lemma PRG_HYB_equiv i:
+  HYB_pkg i ≈₀ HYB_EVAL_pkg i ∘ EVAL true.
 Proof.
   apply eq_rel_perf_ind with (
     (heap_ignore (fset1 key_location)) ⋊
     couple_rhs count_location key_location
-      (fun count k => (count <= i) = (k == None))
+      (fun count k => count <= i -> k = None)
     ).
   1: {
     ssprove_invariant=> //=.
@@ -256,10 +259,7 @@ Proof.
     ssprove_swap_rhs 0.
     apply: r_get_remember_rhs => k.
     apply: (r_rem_couple_rhs count_location key_location) => Hinv.
-    rewrite leqnn in Hinv.
-    apply esym in Hinv.
-    move /eqP in Hinv.
-    rewrite Hinv.
+    rewrite Hinv //.
     apply: r_put_vs_put.
     ssprove_sync=> s.
     apply: r_put_rhs.
@@ -290,24 +290,23 @@ Proof.
     all: move=> s0 s1 [[Hinv _] H] /=.
     all: rewrite /couple_rhs get_set_heap_eq get_set_heap_neq //.
     all: move /eqP in Hlt.
-    + rewrite -Hinv H -subnE Hlt.
-      move /eqP in Hlt.
-      apply ltnW in Hlt.
-      move /eqP in Hlt.
-      by rewrite Hlt.
+    + rewrite Hinv // H -subnE eqnE.
+      by rewrite subn_eq0 ltnW // -subn_eq0 Hlt.
     + move /eqP /negPf in Hlt.
-      rewrite -Hinv H !eqnE -!subnE Hlt.
-      rewrite subn_eq0 in Hlt.
-      by rewrite subn_eq0 leq_eqVlt Heq Hlt.
+      by rewrite -subnE eqnE Hlt.
 Qed.
 
-Lemma PRG_HYB_equiv_false i:
-  HYB_pkg_ff i ∘ EVAL false ≈₀ HYB_pkg_tt i.+1.
+(**
+  This proof is very similar to the previous proof, except it is [T] that is
+  uninitialised when [count <= i].
+*)
+Lemma PRG_HYB_EVAL_equiv i:
+  HYB_EVAL_pkg i ∘ EVAL false ≈₀ HYB_pkg i.+1.
 Proof.
   apply eq_rel_perf_ind with (
     (heap_ignore (fset1 table_location)) ⋊
     couple_lhs count_location table_location
-      (fun count T => (count <= i) = (T == emptym))
+      (fun count T => count <= i -> T = emptym)
     ).
   1: {
     ssprove_invariant => //=.
@@ -322,10 +321,7 @@ Proof.
     ssprove_swap_lhs 0.
     apply: r_get_remember_lhs => T.
     apply: (r_rem_couple_lhs count_location table_location) => Hinv.
-    rewrite leqnn in Hinv.
-    apply esym in Hinv.
-    move /eqP in Hinv.
-    rewrite Hinv /=.
+    rewrite Hinv //=.
     apply: r_put_vs_put.
     ssprove_sync=> r1.
     apply: r_put_lhs.
@@ -361,15 +357,10 @@ Proof.
     all: move=> s0 s1 [[Hinv H] _] /=.
     all: rewrite /couple_lhs get_set_heap_eq get_set_heap_neq //.
     all: move /eqP in Hlt.
-    + rewrite -Hinv H -subnE Hlt.
-      move /eqP in Hlt.
-      apply ltnW in Hlt.
-      move /eqP in Hlt.
-      by rewrite Hlt.
+    + rewrite Hinv // H -subnE eqnE.
+      by rewrite subn_eq0 ltnW // -subn_eq0 Hlt.
     + move /eqP /negPf in Hlt.
-      rewrite -Hinv H !eqnE -!subnE Hlt.
-      rewrite subn_eq0 in Hlt.
-      by rewrite subn_eq0 leq_eqVlt Heq Hlt.
+      by rewrite -subnE eqnE Hlt.
 Qed.
 
 Local Open Scope ring_scope.
@@ -381,36 +372,43 @@ Local Open Scope ring_scope.
 *)
 Definition prf_epsilon := Advantage EVAL.
 
-Theorem security_based_on_prf' LA A q:
+(**
+  First we prove a bound on the hybrid packages. Since [q] can be any number
+  the bound is a sum of [prf_epsilon], and the proof is by induction.
+*)
+Theorem hyb_security_based_on_prf LA A q:
   ValidPackage LA
     [interface #val #[query]: 'unit → 'word × 'word ]
     A_export A ->
   fdisjoint LA (
     EVAL_locs_tt :|: EVAL_locs_ff :|: HYB_locs
   ) ->
-  AdvantageE (HYB_pkg_tt 0) (HYB_pkg_tt q) A <=
-  \sum_(i < q) prf_epsilon (A ∘ HYB_pkg_ff i).
+  AdvantageE (HYB_pkg 0) (HYB_pkg q) A <=
+  \sum_(i < q) prf_epsilon (A ∘ HYB_EVAL_pkg i).
 Proof.
   move=> vA H.
   elim: q => [|q IHq].
   1: by rewrite big_ord0 /AdvantageE GRing.subrr normr0.
-  ssprove triangle (HYB_pkg_tt 0) [::
-    pack (HYB_pkg_tt q) ;
-    HYB_pkg_ff q ∘ EVAL true ;
-    HYB_pkg_ff q ∘ EVAL false
-  ] (HYB_pkg_tt q.+1) A
+  ssprove triangle (HYB_pkg 0) [::
+    pack (HYB_pkg q) ;
+    HYB_EVAL_pkg q ∘ EVAL true ;
+    HYB_EVAL_pkg q ∘ EVAL false
+  ] (HYB_pkg q.+1) A
   as ineq.
   apply: le_trans.
   1: by apply: ineq.
   rewrite !fdisjointUr in H.
   move: H => /andP [/andP [H1 H2] H3].
   move: {ineq H1 H2 H3} (H1, H2, H3) => H.
-  rewrite PRG_HYB_equiv_true ?fdisjointUr ?H // GRing.addr0.
-  rewrite PRG_HYB_equiv_false ?fdisjointUr ?H // GRing.addr0.
+  rewrite PRG_HYB_equiv ?fdisjointUr ?H // GRing.addr0.
+  rewrite PRG_HYB_EVAL_equiv ?fdisjointUr ?H // GRing.addr0.
   rewrite big_ord_recr ler_add //.
   by rewrite /prf_epsilon Advantage_E Advantage_link Advantage_sym.
 Qed.
 
+(**
+  The final statement depends on a proof that
+*)
 Theorem security_based_on_prf LA A q:
   ValidPackage LA
     [interface #val #[query]: 'unit → 'word × 'word ]
@@ -418,14 +416,14 @@ Theorem security_based_on_prf LA A q:
   fdisjoint LA (
     EVAL_locs_tt :|: EVAL_locs_ff :|: HYB_locs
   ) ->
-  HYB_pkg_tt q ≈₀ PRG false ->
-  Advantage PRG A <= \sum_(i < q) prf_epsilon (A ∘ HYB_pkg_ff i).
+  AdvantageE (HYB_pkg q) (PRG false) A = 0 ->
+  Advantage PRG A <= \sum_(i < q) prf_epsilon (A ∘ HYB_EVAL_pkg i).
 Proof.
   move=> vA H PRG_equiv_false.
   rewrite Advantage_E Advantage_sym.
   ssprove triangle (PRG true) [::
-    pack (HYB_pkg_tt 0) ;
-    pack (HYB_pkg_tt q)
+    pack (HYB_pkg 0) ;
+    pack (HYB_pkg q)
   ] (PRG false) A
   as ineq.
   apply: le_trans.
@@ -434,8 +432,8 @@ Proof.
   move: H => /andP [/andP [H1 H2] H3].
   move: {ineq H1 H2 H3} (H1, H2, H3, fdisjoints0) => H.
   rewrite PRG_equiv_true ?fdisjointUr ?H // GRing.add0r.
-  rewrite PRG_equiv_false ?fdisjointUr ?H // GRing.addr0.
-  by rewrite security_based_on_prf' // !fdisjointUr !H.
+  rewrite PRG_equiv_false GRing.addr0.
+  by rewrite hyb_security_based_on_prf // !fdisjointUr !H.
 Qed.
 
 End PRFPRG_example.
