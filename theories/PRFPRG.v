@@ -407,7 +407,10 @@ Proof.
 Qed.
 
 (**
-  The final statement depends on a proof that
+  The final statement requires a proof that [A ∘ HYB_pkg q] and [A ∘ PRG false]
+  are perfectly indistinguishable. The [q] for which this holds depends on the
+  adversary (and might not exist for some adversaries). We sidestep this issue
+  by making it a hypothesis.
 *)
 Theorem security_based_on_prf LA A q:
   ValidPackage LA
