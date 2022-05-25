@@ -1196,12 +1196,12 @@ Proof.
     CTXT_EVAL_pkg_tt ∘ EVAL false ;
     CTXT_EVAL_SAMP_pkg ∘ EVAL_SAMP false ;
     CTXT_EVAL_SAMP_pkg ∘ EVAL_SAMP true ;
-    (CTXT_HYB_pkg_1 ∘ SAMP Key_N false) ;
-    (CTXT_HYB_pkg_1 ∘ SAMP Key_N true) ;
-    (pack CTXT_HYB_pkg_2) ;
-    (pack CTXT_HYB_pkg_3) ;
-    (pack CTXT_HYB_pkg_4) ;
-    (pack CTXT_HYB_pkg_5) ;
+    CTXT_HYB_pkg_1 ∘ SAMP Key_N false ;
+    CTXT_HYB_pkg_1 ∘ SAMP Key_N true ;
+    pack CTXT_HYB_pkg_2 ;
+    pack CTXT_HYB_pkg_3 ;
+    pack CTXT_HYB_pkg_4 ;
+    pack CTXT_HYB_pkg_5 ;
     CTXT_EVAL_pkg_ff ∘ EVAL_SAMP_pkg ∘ SAMP Ciph_N true ;
     CTXT_EVAL_pkg_ff ∘ EVAL_SAMP_pkg ∘ SAMP Ciph_N false ;
     CTXT_EVAL_pkg_ff ∘ EVAL false ;

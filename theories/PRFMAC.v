@@ -67,9 +67,10 @@ Notation " 'word " := (Word) (at level 2): package_scope.
 
 #[local] Open Scope package_scope.
 
+(* TODO: macset_location? Call it [S]? *)
 Definition key_location: Location := ('option 'word ; 0).
 Definition table_location: Location := (chMap 'word 'word ; 1).
-Definition mac_table_location: Location := ('set ('word × 'word) ; 2).
+Definition mac_set_location: Location := ('set ('word × 'word) ; 2).
 Definition lookup: nat := 3.
 Definition encrypt: nat := 4.
 Definition gettag: nat := 5.
@@ -196,7 +197,7 @@ Definition GUESS_pkg_ff:
 Definition GUESS := mkpair GUESS_pkg_tt GUESS_pkg_ff.
 
 Definition TAG_locs_tt := fset [:: key_location].
-Definition TAG_locs_ff := fset [:: key_location; mac_table_location].
+Definition TAG_locs_ff := fset [:: key_location; mac_set_location].
 
 Lemma TAG_locs_tt_key:
   key_location \in TAG_locs_tt.
@@ -235,21 +236,21 @@ Definition TAG_pkg_ff:
       #val #[checktag]: 'word × 'word → 'bool ] :=
   [package
     #def #[gettag] (m: 'word): 'word {
-      T ← get mac_table_location ;;
+      S ← get mac_set_location ;;
       k ← kgen TAG_locs_ff_key ;;
       let t := PRF k m in
-      #put mac_table_location := (setm T (m, t) tt) ;;
+      #put mac_set_location := (setm S (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      T ← get mac_table_location ;;
-      ret ((m, t) \in domm T)
+      S ← get mac_set_location ;;
+      ret ((m, t) \in domm S)
     }
   ].
 
 Definition TAG := mkpair TAG_pkg_tt TAG_pkg_ff.
 
-Definition EVAL_TAG_locs_ff := fset [:: mac_table_location].
+Definition EVAL_TAG_locs_ff := fset [:: mac_set_location].
 
 Definition EVAL_TAG_pkg_tt:
   package fset0
@@ -279,18 +280,18 @@ Definition EVAL_TAG_pkg_ff:
   [package
     #def #[gettag] (m: 'word): 'word {
       #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      T ← get mac_table_location ;;
+      S ← get mac_set_location ;;
       t ← lookup m ;;
-      #put mac_table_location := (setm T (m, t) tt) ;;
+      #put mac_set_location := (setm S (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      T ← get mac_table_location ;;
-      ret ((m, t) \in domm T)
+      S ← get mac_set_location ;;
+      ret ((m, t) \in domm S)
     }
   ].
 
-Definition TAG_GUESS_locs := fset [:: mac_table_location ].
+Definition TAG_GUESS_locs := fset [:: mac_set_location ].
 
 Definition TAG_GUESS_pkg_0:
   package fset0
@@ -324,9 +325,9 @@ Definition TAG_GUESS_pkg_1:
   [package
     #def #[gettag] (m: 'word): 'word {
       #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      T ← get mac_table_location ;;
+      S ← get mac_set_location ;;
       t ← lookup m ;;
-      #put mac_table_location := (setm T (m, t) tt) ;;
+      #put mac_set_location := (setm S (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
@@ -347,14 +348,14 @@ Definition TAG_GUESS_pkg_2:
   [package
     #def #[gettag] (m: 'word): 'word {
       #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      T ← get mac_table_location ;;
+      S ← get mac_set_location ;;
       t ← lookup m ;;
-      #put mac_table_location := (setm T (m, t) tt) ;;
+      #put mac_set_location := (setm S (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      T ← get mac_table_location ;;
-      ret ((m, t) \in domm T)
+      S ← get mac_set_location ;;
+      ret ((m, t) \in domm S)
     }
   ].
 
@@ -397,9 +398,9 @@ Proof.
   simplify_eq_rel m.
   2: case: m => [m t].
   all: simplify_linking.
-  - apply: r_get_remember_rhs => T2.
-    ssprove_sync=> T1.
-    case: (getm T1 m) => [k|].
+  - apply: r_get_remember_rhs => S.
+    ssprove_sync=> T.
+    case: (getm T m) => [k|].
     all: simpl.
     2: ssprove_sync=> t.
     2: ssprove_sync.
@@ -408,8 +409,8 @@ Proof.
       last by apply: r_ret.
     all: by ssprove_invariant.
   - simplify_linking.
-    ssprove_sync=> T1.
-    case: (getm T1 m) => [k|].
+    ssprove_sync=> T.
+    case: (getm T m) => [k|].
     all: by apply: r_ret.
 Qed.
 
@@ -423,9 +424,9 @@ Lemma TAG_GUESS_equiv_2:
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    couple_rhs table_location mac_table_location
-      (fun T1 T2 => forall m t,
-        ((m, t) \in domm T2) = (getm T1 m == Some t))
+    couple_rhs table_location mac_set_location
+      (fun T S => forall m t,
+        ((m, t) \in domm S) = (getm T m == Some t))
   ).
   1: {
     ssprove_invariant=> /=.
@@ -437,9 +438,9 @@ Proof.
   2: case: m => [m t].
   all: simpl.
   all: simplify_linking.
-  - apply: r_get_vs_get_remember => T2.
-    apply: r_get_vs_get_remember => T1.
-    destruct (getm T1 m) as [t|] eqn:Heqt.
+  - apply: r_get_vs_get_remember => S.
+    apply: r_get_vs_get_remember => T.
+    destruct (getm T m) as [t|] eqn:Heqt.
     all: rewrite Heqt /=.
     + apply: r_put_vs_put.
       ssprove_restore_mem;
@@ -452,7 +453,7 @@ Proof.
       * move /eqP /negPf in Heq.
         by rewrite Heq -H1 Hinv.
     + ssprove_sync=> k.
-      apply: (r_rem_couple_rhs table_location mac_table_location) => Hinv.
+      apply: (r_rem_couple_rhs table_location mac_set_location) => Hinv.
       apply: r_put_vs_put.
       apply: r_put_vs_put.
       ssprove_restore_mem;
@@ -475,11 +476,11 @@ Proof.
         by rewrite Heqm Hinv.
   - ssprove_code_simpl.
     ssprove_code_simpl_more.
-    apply: r_get_remember_lhs => T1.
-    apply: r_get_remember_rhs => T2.
-    apply: (r_rem_couple_rhs table_location mac_table_location) => [|Hinv].
+    apply: r_get_remember_lhs => T.
+    apply: r_get_remember_rhs => S.
+    apply: (r_rem_couple_rhs table_location mac_set_location) => [|Hinv].
     1: by apply: (Remembers_rhs_from_tracked_lhs _).
-    case: (eq_dec (getm T1 m == Some t) true) => /eqP Heq.
+    case: (eq_dec (getm T m == Some t) true) => /eqP Heq.
     + rewrite Heq eq_refl.
       move /eqP in Heq.
       shelve.
@@ -516,7 +517,7 @@ Proof.
     last by move=> [? ?] [? ?] [].
   2: case: m => [m t].
   all: simplify_linking.
-  all: ssprove_sync_eq=> T.
+  all: ssprove_sync_eq=> S.
   1: ssprove_sync_eq.
   1: case => [k|].
   all: by apply: rreflexivity_rule.

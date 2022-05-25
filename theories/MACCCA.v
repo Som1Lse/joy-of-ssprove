@@ -67,9 +67,9 @@ Notation " 'word " := (Word) (in custom pack_type at level 2).
 Notation " 'word " := (Word) (at level 2): package_scope.
 
 Definition mac_key_location: Location := ('option 'word ; 0).
-Definition mac_table_location: Location := ('set ('word × 'word) ; 1).
+Definition mac_set_location: Location := ('set ('word × 'word) ; 1).
 Definition enc_key_location: Location := ('option 'word ; 2).
-Definition cca_table_location: Location := ('set ('word × 'word) ; 3).
+Definition cca_set_location: Location := ('set ('word × 'word) ; 3).
 Definition gettag: nat := 4.
 Definition checktag: nat := 5.
 Definition eavesdrop: nat := 6.
@@ -80,7 +80,7 @@ Definition mkpair {Lt Lf E}
   loc_GamePair E := fun b => if b then {locpackage t} else {locpackage f}.
 
 Definition TAG_locs_tt := fset [:: mac_key_location].
-Definition TAG_locs_ff := fset [:: mac_key_location; mac_table_location].
+Definition TAG_locs_ff := fset [:: mac_key_location; mac_set_location].
 
 Definition kgen {L I l} (_: ('option 'word ; l) \in L): code L I 'word :=
   {code
@@ -132,14 +132,14 @@ Definition TAG_pkg_ff:
       #val #[checktag]: 'word × 'word → 'bool ] :=
   [package
     #def #[gettag] (m: 'word): 'word {
-      T ← get mac_table_location ;;
+      T ← get mac_set_location ;;
       k ← kgen TAG_locs_ff_key ;;
       let t := mac k m in
-      #put mac_table_location := (setm T (m, t) tt) ;;
+      #put mac_set_location := (setm T (m, t) tt) ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      T ← get mac_table_location ;;
+      T ← get mac_set_location ;;
       ret ((m, t) \in domm T)
     }
   ].
@@ -176,7 +176,7 @@ Definition CPA_EVAL_pkg_ff:
 
 Definition CPA_EVAL := mkpair CPA_EVAL_pkg_tt CPA_EVAL_pkg_ff.
 
-Definition CCA_EVAL_locs := fset [:: mac_key_location; enc_key_location; cca_table_location].
+Definition CCA_EVAL_locs := fset [:: mac_key_location; enc_key_location; cca_set_location].
 
 Lemma CCA_EVAL_locs_mac_key:
   mac_key_location \in CCA_EVAL_locs.
@@ -197,16 +197,16 @@ Definition CCA_EVAL_pkg_tt:
       #val #[decrypt]: 'word × 'word → 'option 'word ] :=
   [package
     #def #[eavesdrop] ('(ml, mr): 'word × 'word): 'word × 'word {
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       ke ← kgen CCA_EVAL_locs_enc_key ;;
       km ← kgen CCA_EVAL_locs_mac_key ;;
       let c := enc ke ml in
       let t := mac km c in
-      #put cca_table_location := (setm S (c, t) tt) ;;
+      #put cca_set_location := (setm S (c, t) tt) ;;
       ret (c, t)
     } ;
     #def #[decrypt] ('(c, t): 'word × 'word): 'option 'word {
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       if ((c, t) \in domm S) then ret None else
       km ← kgen CCA_EVAL_locs_mac_key ;;
       if (t != mac km c) then ret None else
@@ -222,16 +222,16 @@ Definition CCA_EVAL_pkg_ff:
       #val #[decrypt]: 'word × 'word → 'option 'word ] :=
   [package
     #def #[eavesdrop] ('(ml, mr): 'word × 'word): 'word × 'word {
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       ke ← kgen CCA_EVAL_locs_enc_key ;;
       km ← kgen CCA_EVAL_locs_mac_key ;;
       let c := enc ke mr in
       let t := mac km c in
-      #put cca_table_location := (setm S (c, t) tt) ;;
+      #put cca_set_location := (setm S (c, t) tt) ;;
       ret (c, t)
     } ;
     #def #[decrypt] ('(c, t): 'word × 'word): 'option 'word {
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       if ((c, t) \in domm S) then ret None else
       km ← kgen CCA_EVAL_locs_mac_key ;;
       if (t != mac km c) then ret None else
@@ -242,7 +242,7 @@ Definition CCA_EVAL_pkg_ff:
 
 Definition CCA_EVAL := mkpair CCA_EVAL_pkg_tt CCA_EVAL_pkg_ff.
 
-Definition CCA_EVAL_TAG_locs := fset [:: enc_key_location; cca_table_location].
+Definition CCA_EVAL_TAG_locs := fset [:: enc_key_location; cca_set_location].
 
 Lemma CCA_EVAL_TAG_locs_enc_key:
   enc_key_location \in CCA_EVAL_TAG_locs.
@@ -261,16 +261,16 @@ Definition CCA_EVAL_TAG_pkg_tt:
   [package
     #def #[eavesdrop] ('(ml, mr): 'word × 'word): 'word × 'word {
       #import {sig #[gettag]: 'word → 'word } as gettag ;;
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       ke ← kgen CCA_EVAL_TAG_locs_enc_key ;;
       let c := enc ke ml in
       t ← gettag c ;;
-      #put cca_table_location := (setm S (c, t) tt) ;;
+      #put cca_set_location := (setm S (c, t) tt) ;;
       ret (c, t)
     } ;
     #def #[decrypt] ('(c, t): 'word × 'word): 'option 'word {
       #import {sig #[checktag]: 'word × 'word → 'bool } as checktag ;;
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       if ((c, t) \in domm S) then ret None else
       r ← checktag (c, t) ;;
       if (~~ r) then ret None else
@@ -290,16 +290,16 @@ Definition CCA_EVAL_TAG_pkg_ff:
   [package
     #def #[eavesdrop] ('(ml, mr): 'word × 'word): 'word × 'word {
       #import {sig #[gettag]: 'word → 'word } as gettag ;;
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       ke ← kgen CCA_EVAL_TAG_locs_enc_key ;;
       let c := enc ke mr in
       t ← gettag c ;;
-      #put cca_table_location := (setm S (c, t) tt) ;;
+      #put cca_set_location := (setm S (c, t) tt) ;;
       ret (c, t)
     } ;
     #def #[decrypt] ('(c, t): 'word × 'word): 'option 'word {
       #import {sig #[checktag]: 'word × 'word → 'bool } as checktag ;;
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       if ((c, t) \in domm S) then ret None else
       r ← checktag (c, t) ;;
       if (~~ r) then ret None else
@@ -308,7 +308,7 @@ Definition CCA_EVAL_TAG_pkg_ff:
     }
   ].
 
-Definition CCA_EVAL_HYB_locs := fset [:: mac_key_location; mac_table_location; cca_table_location].
+Definition CCA_EVAL_HYB_locs := fset [:: mac_key_location; mac_set_location; cca_set_location].
 
 Lemma CCA_EVAL_HYB_locs_mac_key:
   mac_key_location \in CCA_EVAL_HYB_locs.
@@ -325,13 +325,13 @@ Definition CCA_EVAL_HYB_pkg:
   [package
     #def #[eavesdrop] ('(ml, mr): 'word × 'word): 'word × 'word {
       #import {sig #[eavesdrop]: 'word × 'word → 'word } as eavesdrop ;;
-      S ← get cca_table_location ;;
+      S ← get cca_set_location ;;
       c ← eavesdrop (ml, mr) ;;
-      T ← get mac_table_location ;;
+      T ← get mac_set_location ;;
       km ← kgen CCA_EVAL_HYB_locs_mac_key ;;
       let t := mac km c in
-      #put mac_table_location := (setm T (c, t) tt) ;;
-      #put cca_table_location := (setm S (c, t) tt) ;;
+      #put mac_set_location := (setm T (c, t) tt) ;;
+      #put cca_set_location := (setm S (c, t) tt) ;;
       ret (c, t)
     } ;
     #def #[decrypt] ('(c, t): 'word × 'word): 'option 'word {
@@ -357,7 +357,7 @@ Lemma CCA_EVAL_HYB_equiv_true:
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    couple_lhs cca_table_location mac_table_location
+    couple_lhs cca_set_location mac_set_location
       (fun S T => S = T)
   ).
   1: {
@@ -381,7 +381,7 @@ Proof.
     2,4: ssprove_sync=> km;
       ssprove_sync;
       first by move=> ? ? ->.
-    all: apply: (r_rem_couple_lhs cca_table_location mac_table_location) => Hinv.
+    all: apply: (r_rem_couple_lhs cca_set_location mac_set_location) => Hinv.
     all: apply: r_put_vs_put.
     all: apply: r_put_vs_put.
     all: ssprove_restore_mem;
@@ -394,7 +394,7 @@ Proof.
     all: rewrite Heq.
     1: by apply: r_ret => ? ? [].
     apply: r_get_remember_lhs => T.
-    apply: (r_rem_couple_lhs cca_table_location mac_table_location) => Hinv.
+    apply: (r_rem_couple_lhs cca_set_location mac_set_location) => Hinv.
     rewrite -Hinv Heq /=.
     by apply: r_ret => ? ? [] [].
 Qed.
@@ -404,7 +404,7 @@ Lemma CCA_EVAL_HYB_equiv_false:
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    couple_rhs cca_table_location mac_table_location
+    couple_rhs cca_set_location mac_set_location
       (fun S T => S = T)
   ).
   1: {
@@ -428,7 +428,7 @@ Proof.
     2,4: ssprove_sync=> km;
       ssprove_sync;
       first by move=> ? ? ->.
-    all: apply: (r_rem_couple_rhs cca_table_location mac_table_location) => Hinv.
+    all: apply: (r_rem_couple_rhs cca_set_location mac_set_location) => Hinv.
     all: apply: r_put_vs_put.
     all: apply: r_put_vs_put.
     all: ssprove_restore_mem;
@@ -441,7 +441,7 @@ Proof.
     all: rewrite Heq.
     1: by apply: r_ret => ? ? [].
     apply: r_get_remember_rhs => T.
-    apply: (r_rem_couple_rhs cca_table_location mac_table_location) => Hinv.
+    apply: (r_rem_couple_rhs cca_set_location mac_set_location) => Hinv.
     rewrite -Hinv Heq /=.
     by apply: r_ret => ? ? [] [].
 Qed.

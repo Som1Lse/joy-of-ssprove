@@ -138,6 +138,10 @@ Qed.
 Notation " 'word " := (Word) (in custom pack_type at level 2).
 Notation " 'word " := (Word) (at level 2): package_scope.
 
+(**
+  We can't use sequences directly in [choice_type] so instead we use a map from
+  natural numbers to the type.
+*)
 Definition chSeq t := chMap 'nat t.
 
 Notation " 'seq t " := (chSeq t) (in custom pack_type at level 2).
@@ -244,8 +248,8 @@ Lemma TSSS_HYB_equiv_tt:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  apply rpost_weaken_rule with eq.
-  2: intros [] [] Heq; by case: Heq.
+  apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case m => ml [mr u].
   set u' := _ (domm u).
   case: u' => [|a u'] /=.
@@ -269,8 +273,8 @@ Lemma TSSS_HYB_equiv:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  apply rpost_weaken_rule with eq.
-  2: intros [] [] Heq; by case: Heq.
+  apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case m => ml [mr u].
   set u' := _ (domm u).
   case: u' => [|a u'].
@@ -299,8 +303,8 @@ Lemma TSSS_HYB_equiv_ff:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  apply rpost_weaken_rule with eq.
-  2: intros [] [] Heq; by case: Heq.
+  apply rpost_weaken_rule with eq;
+    last by move=> [? ?] [? ?] [].
   case m => ml [mr u].
   set u' := _ (domm u).
   case: u' => [|a u'] /=.

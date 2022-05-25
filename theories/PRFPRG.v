@@ -3,7 +3,7 @@
   It shows how to work with variable length proofs.
 
   It is fairly complete. One thing that is missing is the final step, which is
-  proving the last hybrid is perfectly indistinguishable from [PRG false],
+  proving the last hybrid is perfectly indistinguishable from [GEN false],
   which, to my knowledge, cannot (yet) be formalised in SSProve, so instead we
   make it a hypothesis of the final statement [security_based_on_prf].
 *)
@@ -39,7 +39,7 @@ Import Num.Def.
 Import Num.Theory.
 Import Order.POrderTheory.
 
-Section PRFPRG_example.
+Section PRFGEN_example.
 
 Variable (n: nat).
 
@@ -131,30 +131,28 @@ Definition EVAL_pkg_ff:
 
 Definition EVAL := mkpair EVAL_pkg_tt EVAL_pkg_ff.
 
-Definition PRG_pkg_tt:
-  package fset0
-    [interface]
+Definition GEN_pkg_tt:
+  package fset0 [interface]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
-      #def #[query] (_: 'unit): 'word × 'word {
-        s <$ uniform Word_N ;;
-        ret (PRF s zero, PRF s one)
-      }
+    #def #[query] (_: 'unit): 'word × 'word {
+      s <$ uniform Word_N ;;
+      ret (PRF s zero, PRF s one)
+    }
   ].
 
-Definition PRG_pkg_ff:
-  package fset0
-    [interface]
+Definition GEN_pkg_ff:
+  package fset0 [interface]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
-      #def #[query] (_: 'unit): 'word × 'word {
-        r1 <$ uniform Word_N ;;
-        r2 <$ uniform Word_N ;;
-        ret (r1, r2)
-      }
+    #def #[query] (_: 'unit): 'word × 'word {
+      r1 <$ uniform Word_N ;;
+      r2 <$ uniform Word_N ;;
+      ret (r1, r2)
+    }
   ].
 
-Definition PRG := mkpair PRG_pkg_tt PRG_pkg_ff.
+Definition GEN := mkpair GEN_pkg_tt GEN_pkg_ff.
 
 Definition HYB_locs := fset [:: count_location ].
 
@@ -171,17 +169,17 @@ Definition HYB_pkg i:
     [interface]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
-      #def #[query] (_: 'unit): 'word × 'word {
-        count ← get count_location ;;
-        #put count_location := count.+1 ;;
-        if count < i then
-          r1 <$ uniform Word_N ;;
-          r2 <$ uniform Word_N ;;
-          ret (r1, r2)
-        else
-          s <$ uniform Word_N ;;
-          ret (PRF s zero, PRF s one)
-      }
+    #def #[query] (_: 'unit): 'word × 'word {
+      count ← get count_location ;;
+      #put count_location := count.+1 ;;
+      if count < i then
+        r1 <$ uniform Word_N ;;
+        r2 <$ uniform Word_N ;;
+        ret (r1, r2)
+      else
+        s <$ uniform Word_N ;;
+        ret (PRF s zero, PRF s one)
+    }
   ].
 
 Definition HYB_EVAL_pkg i:
@@ -189,27 +187,26 @@ Definition HYB_EVAL_pkg i:
     [interface #val #[lookup]: 'word → 'word ]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
-      #def #[query] (_: 'unit): 'word × 'word {
-        #import {sig #[lookup]: 'word → 'word } as lookup ;;
-        count ← get count_location ;;
-        #put count_location := count.+1 ;;
-        if count < i then
-          x <$ uniform Word_N ;;
-          y <$ uniform Word_N ;;
-          ret (x, y)
-        else if count == i then
-          x ← lookup zero ;;
-          y ← lookup one ;;
-          ret (x, y)
-        else
-          s <$ uniform Word_N ;;
-          ret (PRF s zero, PRF s one)
-      }
+    #def #[query] (_: 'unit): 'word × 'word {
+      #import {sig #[lookup]: 'word → 'word } as lookup ;;
+      count ← get count_location ;;
+      #put count_location := count.+1 ;;
+      if count < i then
+        x <$ uniform Word_N ;;
+        y <$ uniform Word_N ;;
+        ret (x, y)
+      else if count == i then
+        x ← lookup zero ;;
+        y ← lookup one ;;
+        ret (x, y)
+      else
+        s <$ uniform Word_N ;;
+        ret (PRF s zero, PRF s one)
+    }
   ].
 
 Definition EVAL_HYB_pkg:
-  package fset0
-    [interface]
+  package fset0 [interface]
     [interface #val #[lookup]: 'word → 'word ] :=
   [package
     #def #[lookup] (_: 'word): 'word {
@@ -218,8 +215,8 @@ Definition EVAL_HYB_pkg:
     }
   ].
 
-Lemma PRG_equiv_true:
-  PRG true ≈₀ HYB_pkg 0.
+Lemma GEN_equiv_true:
+  GEN true ≈₀ HYB_pkg 0.
 Proof.
   apply eq_rel_perf_ind_ignore with (fset1 count_location).
   1: by rewrite /HYB_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
@@ -238,7 +235,7 @@ Qed.
   The proofs are fairly simple. The main trick is to realise that [k] is
   uninitialised when [count <= i].
 *)
-Lemma PRG_HYB_equiv i:
+Lemma GEN_HYB_equiv i:
   HYB_pkg i ≈₀ HYB_EVAL_pkg i ∘ EVAL true.
 Proof.
   apply eq_rel_perf_ind with (
@@ -300,7 +297,7 @@ Qed.
   This proof is very similar to the previous proof, except it is [T] that is
   uninitialised when [count <= i].
 *)
-Lemma PRG_HYB_EVAL_equiv i:
+Lemma GEN_HYB_EVAL_equiv i:
   HYB_EVAL_pkg i ∘ EVAL false ≈₀ HYB_pkg i.+1.
 Proof.
   apply eq_rel_perf_ind with (
@@ -400,14 +397,14 @@ Proof.
   rewrite !fdisjointUr in H.
   move: H => /andP [/andP [H1 H2] H3].
   move: {ineq H1 H2 H3} (H1, H2, H3) => H.
-  rewrite PRG_HYB_equiv ?fdisjointUr ?H // GRing.addr0.
-  rewrite PRG_HYB_EVAL_equiv ?fdisjointUr ?H // GRing.addr0.
+  rewrite GEN_HYB_equiv ?fdisjointUr ?H // GRing.addr0.
+  rewrite GEN_HYB_EVAL_equiv ?fdisjointUr ?H // GRing.addr0.
   rewrite big_ord_recr ler_add //.
   by rewrite /prf_epsilon Advantage_E Advantage_link Advantage_sym.
 Qed.
 
 (**
-  The final statement requires a proof that [A ∘ HYB_pkg q] and [A ∘ PRG false]
+  The final statement requires a proof that [A ∘ HYB_pkg q] and [A ∘ GEN false]
   are perfectly indistinguishable. The [q] for which this holds depends on the
   adversary (and might not exist for some adversaries). We sidestep this issue
   by making it a hypothesis.
@@ -419,24 +416,24 @@ Theorem security_based_on_prf LA A q:
   fdisjoint LA (
     EVAL_locs_tt :|: EVAL_locs_ff :|: HYB_locs
   ) ->
-  AdvantageE (HYB_pkg q) (PRG false) A = 0 ->
-  Advantage PRG A <= \sum_(i < q) prf_epsilon (A ∘ HYB_EVAL_pkg i).
+  AdvantageE (HYB_pkg q) (GEN false) A = 0 ->
+  Advantage GEN A <= \sum_(i < q) prf_epsilon (A ∘ HYB_EVAL_pkg i).
 Proof.
-  move=> vA H PRG_equiv_false.
+  move=> vA H GEN_equiv_false.
   rewrite Advantage_E Advantage_sym.
-  ssprove triangle (PRG true) [::
+  ssprove triangle (GEN true) [::
     pack (HYB_pkg 0) ;
     pack (HYB_pkg q)
-  ] (PRG false) A
+  ] (GEN false) A
   as ineq.
   apply: le_trans.
   1: by apply: ineq.
   rewrite !fdisjointUr in H.
   move: H => /andP [/andP [H1 H2] H3].
   move: {ineq H1 H2 H3} (H1, H2, H3, fdisjoints0) => H.
-  rewrite PRG_equiv_true ?fdisjointUr ?H // GRing.add0r.
-  rewrite PRG_equiv_false GRing.addr0.
+  rewrite GEN_equiv_true ?fdisjointUr ?H // GRing.add0r.
+  rewrite GEN_equiv_false GRing.addr0.
   by rewrite hyb_security_based_on_prf // !fdisjointUr !H.
 Qed.
 
-End PRFPRG_example.
+End PRFGEN_example.

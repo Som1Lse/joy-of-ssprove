@@ -1028,8 +1028,7 @@ Definition TSSS_HYB_pkg_ff:
   ].
 
 Definition SHARE_pkg_tt:
-  package fset0
-    [interface]
+  package fset0 [interface]
     [interface #val #[share_m]: 'word × 'set 'party → 'seq 'share ] :=
   [package
     #def #[share_m] ('(m, u): 'word × 'set 'party): 'seq 'share {
@@ -1042,8 +1041,7 @@ Definition SHARE_pkg_tt:
   ].
 
 Definition SHARE_pkg_ff:
-  package fset0
-    [interface]
+  package fset0 [interface]
     [interface #val #[share_m]: 'word × 'set 'party → 'seq 'share ] :=
   [package
     #def #[share_m] ('(m, u): 'word × 'set 'party): 'seq 'share {
@@ -1068,7 +1066,7 @@ Lemma TSSS_HYB_equiv_tt:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
+  apply rpost_weaken_rule with eq;
     last by move=> [? ?] [? ?] [].
   case: m => ml [mr u].
   simplify_linking.
@@ -1086,7 +1084,7 @@ Lemma SHARE_equiv:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
+  apply rpost_weaken_rule with eq;
     last by move=> [? ?] [? ?] [].
   case: m => m u.
   destruct (t <= size _) eqn:Heq.
@@ -1113,7 +1111,7 @@ Lemma TSSS_HYB_equiv:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
+  apply rpost_weaken_rule with eq;
     last by move=> [? ?] [? ?] [].
   case: m => ml [mr u].
   simplify_linking.
@@ -1128,7 +1126,7 @@ Lemma TSSS_HYB_equiv_ff:
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
+  apply rpost_weaken_rule with eq;
     last by move=> [? ?] [? ?] [].
   case: m => ml [mr u].
   simplify_linking.
