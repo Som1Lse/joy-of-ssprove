@@ -203,12 +203,12 @@ Notation " 'key " := (Key) (at level 2): package_scope.
 Notation " 'ciph " := (Ciph) (in custom pack_type at level 2).
 Notation " 'ciph " := (Ciph) (at level 2): package_scope.
 
-Definition key_location: Location := ('option 'key ; 0).
-Definition table_location: Location := (chMap 'ciph 'ciph ; 1).
-Definition invtable_location: Location := (chMap 'ciph 'ciph ; 2).
-Definition altinvtable_location: Location := (chMap 'ciph 'ciph ; 3).
-Definition cipherset_location: Location := ('set 'ciph ; 4).
-Definition keyset_location: Location := ('set 'key ; 5).
+Definition k_loc: Location := ('option 'key ; 0).
+Definition T_loc: Location := (chMap 'ciph 'ciph ; 1).
+Definition Tinv_loc: Location := (chMap 'ciph 'ciph ; 2).
+Definition Tinv'_loc: Location := (chMap 'ciph 'ciph ; 3).
+Definition S_loc: Location := ('set 'ciph ; 4).
+Definition R_loc: Location := ('set 'key ; 5).
 Definition samp: nat := 6.
 Definition ctxt: nat := 7.
 Definition decrypt: nat := 8.
@@ -248,27 +248,35 @@ Definition SAMP_pkg_ff (p: nat) `{Positive p}:
 Definition SAMP (p: nat) `{Positive p} :=
   mkpair (SAMP_pkg_tt p) (SAMP_pkg_ff p).
 
-Definition kgen {L} (_: key_location \in L): code L [interface] 'key :=
-  {code
-    k_init ← get key_location ;;
-    match k_init with
-    | None =>
-        k <$ uniform Key_N ;;
-        #put key_location := Some k ;;
-        ret k
-    | Some k =>
-        ret k
-    end
-  }.
+Definition kgen: raw_code 'key :=
+  k_init ← get k_loc ;;
+  match k_init with
+  | None =>
+      k <$ uniform Key_N ;;
+      #put k_loc := Some k ;;
+      ret k
+  | Some k => ret k
+  end.
 
-Definition EVAL_locs_tt := (fset [:: key_location]).
-Definition EVAL_locs_ff := (fset [:: table_location; invtable_location]).
-
-Lemma EVAL_locs_tt_key:
-  key_location \in EVAL_locs_tt.
+Lemma kgen_valid {L I}:
+  k_loc \in L ->
+  ValidCode L I kgen.
 Proof.
-  auto_in_fset.
+  move=> H.
+  apply: valid_getr => [// | [k|]].
+  1: by apply: valid_ret.
+  apply: valid_sampler => k.
+  apply: valid_putr => //.
+  by apply: valid_ret => //.
 Qed.
+
+Hint Extern 1 (ValidCode ?L ?I kgen) =>
+  eapply kgen_valid ;
+  auto_in_fset
+  : typeclass_instances ssprove_valid_db.
+
+Definition EVAL_locs_tt := (fset [:: k_loc]).
+Definition EVAL_locs_ff := (fset [:: T_loc; Tinv_loc]).
 
 (**
   Next, we define the packages for the SPRP, [EVAL]. They follow the definitions
@@ -284,11 +292,11 @@ Definition EVAL_pkg_tt:
       #val #[invlookup]: 'ciph → 'ciph ] :=
   [package
     #def #[lookup] (m: 'ciph): 'ciph {
-      k ← kgen EVAL_locs_tt_key ;;
+      k ← kgen ;;
       ret (PRP k m)
     } ;
     #def #[invlookup] (m: 'ciph): 'ciph {
-      k ← kgen EVAL_locs_tt_key ;;
+      k ← kgen ;;
       ret (PRP' k m)
     }
   ].
@@ -301,29 +309,27 @@ Definition EVAL_pkg_ff:
       #val #[invlookup]: 'ciph → 'ciph ] :=
   [package
     #def #[lookup] (x: 'ciph): 'ciph {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       match getm T x with
       | None =>
           y ← samp_no_repl (codomm T) ;;
-          Tinv ← get invtable_location ;;
-          #put table_location := (setm T x y) ;;
-          #put invtable_location := (setm Tinv y x) ;;
+          Tinv ← get Tinv_loc ;;
+          #put T_loc := setm T x y ;;
+          #put Tinv_loc := setm Tinv y x ;;
           ret y
-      | Some y =>
-          ret y
+      | Some y => ret y
       end
     } ;
     #def #[invlookup] (y: 'ciph): 'ciph {
-      Tinv ← get invtable_location ;;
+      Tinv ← get Tinv_loc ;;
       match getm Tinv y with
       | None =>
           x ← samp_no_repl (codomm Tinv) ;;
-          T ← get table_location ;;
-          #put table_location := (setm T x y) ;;
-          #put invtable_location := (setm Tinv y x) ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T x y ;;
+          #put Tinv_loc := setm Tinv y x ;;
           ret x
-      | Some x =>
-          ret x
+      | Some x => ret x
       end
     }
   ].
@@ -337,44 +343,36 @@ Definition EVAL_SAMP_pkg:
       #val #[invlookup]: 'ciph → 'ciph ] :=
   [package
     #def #[lookup] (x: 'ciph): 'ciph {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       match getm T x with
       | None =>
           #import {sig #[samp]: 'set 'ciph → 'ciph } as samp ;;
           y ← samp (fset_to_chset (codomm T)) ;;
-          Tinv ← get invtable_location ;;
-          #put table_location := (setm T x y) ;;
-          #put invtable_location := (setm Tinv y x) ;;
+          Tinv ← get Tinv_loc ;;
+          #put T_loc := setm T x y ;;
+          #put Tinv_loc := setm Tinv y x ;;
           ret y
-      | Some y =>
-          ret y
+      | Some y => ret y
       end
     } ;
     #def #[invlookup] (y: 'ciph): 'ciph {
-      Tinv ← get invtable_location ;;
+      Tinv ← get Tinv_loc ;;
       match getm Tinv y with
       | None =>
           #import {sig #[samp]: 'set 'ciph → 'ciph } as samp ;;
           x ← samp (fset_to_chset (codomm Tinv)) ;;
-          T ← get table_location ;;
-          #put table_location := (setm T x y) ;;
-          #put invtable_location := (setm Tinv y x) ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T x y ;;
+          #put Tinv_loc := setm Tinv y x ;;
           ret x
-      | Some x =>
-          ret x
+      | Some x => ret x
       end
     }
   ].
 
 Definition EVAL := mkpair EVAL_pkg_tt EVAL_pkg_ff.
 
-Definition CTXT_locs := (fset [:: key_location; cipherset_location]).
-
-Lemma CTXT_locs_key:
-  key_location \in CTXT_locs.
-Proof.
-  auto_in_fset.
-Qed.
+Definition CTXT_locs := (fset [:: k_loc; S_loc]).
 
 (**
   We now get to the main definitions of the proof. We are trying to prove the
@@ -389,16 +387,16 @@ Definition CTXT_pkg_tt:
   [package
     #def #[ctxt] (m: 'word): 'ciph {
       r <$ uniform Key_N ;;
-      k ← kgen CTXT_locs_key ;;
+      k ← kgen ;;
       let c := PRP k (mkciph m r) in
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      k ← kgen CTXT_locs_key ;;
+      k ← kgen ;;
       ret (ciph_to_pair (PRP' k c)).1
     }
   ].
@@ -412,21 +410,21 @@ Definition CTXT_pkg_ff:
   [package
     #def #[ctxt] (m: 'word): 'ciph {
       c <$ uniform Ciph_N ;;
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      k ← kgen CTXT_locs_key ;;
+      k ← kgen ;;
       ret (ciph_to_pair (PRP' k c)).1
     }
   ].
 
 Definition CTXT := mkpair CTXT_pkg_tt CTXT_pkg_ff.
 
-Definition CTXT_EVAL_locs := (fset [:: cipherset_location]).
+Definition CTXT_EVAL_locs := (fset [:: S_loc]).
 
 Definition CTXT_EVAL_pkg_tt:
   package CTXT_EVAL_locs
@@ -441,13 +439,13 @@ Definition CTXT_EVAL_pkg_tt:
       #import {sig #[lookup]: 'ciph → 'ciph } as lookup ;;
       r <$ uniform Key_N ;;
       c ← lookup (mkciph m r) ;;
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       #import {sig #[invlookup]: 'ciph → 'ciph } as invlookup ;;
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
       mr ← invlookup c ;;
       let (m, r) := ciph_to_pair mr in
@@ -455,7 +453,7 @@ Definition CTXT_EVAL_pkg_tt:
     }
   ].
 
-Definition CTXT_EVAL_SAMP_locs := (fset [:: cipherset_location; keyset_location]).
+Definition CTXT_EVAL_SAMP_locs := (fset [:: S_loc; R_loc]).
 
 Definition CTXT_EVAL_SAMP_pkg:
   package CTXT_EVAL_SAMP_locs
@@ -470,22 +468,22 @@ Definition CTXT_EVAL_SAMP_pkg:
     #def #[ctxt] (m: 'word): 'ciph {
       #import {sig #[samp]: 'set 'key → 'key } as samp ;;
       #import {sig #[lookup]: 'ciph → 'ciph } as lookup ;;
-      R ← get keyset_location ;;
+      R ← get R_loc ;;
       r ← samp R ;;
       c ← lookup (mkciph m r) ;;
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
-      #put keyset_location := (setm R r tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
+      #put R_loc := setm R r tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       #import {sig #[invlookup]: 'ciph → 'ciph } as invlookup ;;
-      R ← get keyset_location ;;
-      S ← get cipherset_location ;;
+      R ← get R_loc ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
       mr ← invlookup c ;;
       let (m, r) := ciph_to_pair mr in
-      #put keyset_location := (setm R r tt) ;;
+      #put R_loc := setm R r tt ;;
       ret m
     }
   ].
@@ -519,7 +517,7 @@ Proof.
   1-2: by rewrite fset_cons fsetUC fset1E fsubsetxx.
 Defined.
 
-Definition CTXT_HYB_locs_1 := (fset [:: cipherset_location; keyset_location; table_location; invtable_location]).
+Definition CTXT_HYB_locs_1 := (fset [:: S_loc; R_loc; T_loc; Tinv_loc]).
 
 Definition CTXT_HYB_pkg_1:
   package CTXT_HYB_locs_1
@@ -531,41 +529,40 @@ Definition CTXT_HYB_pkg_1:
   [package
     #def #[ctxt] (m: 'word): 'ciph {
       #import {sig #[samp]: 'set 'key → 'key } as samp ;;
-      R ← get keyset_location ;;
+      R ← get R_loc ;;
       r ← samp R ;;
       let mr := mkciph m r in
-      T ← get table_location ;;
+      T ← get T_loc ;;
       c <$ uniform Ciph_N ;;
-      Tinv ← get invtable_location ;;
-      S ← get cipherset_location ;;
-      #put table_location := (setm T mr c) ;;
-      #put invtable_location := (setm Tinv c mr) ;;
-      #put cipherset_location := (setm S c tt) ;;
-      #put keyset_location := (setm R r tt) ;;
+      Tinv ← get Tinv_loc ;;
+      S ← get S_loc ;;
+      #put T_loc := setm T mr c ;;
+      #put Tinv_loc := setm Tinv c mr ;;
+      #put S_loc := setm S c tt ;;
+      #put R_loc := setm R r tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      R ← get keyset_location ;;
-      S ← get cipherset_location ;;
+      R ← get R_loc ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      Tinv ← get invtable_location ;;
+      Tinv ← get Tinv_loc ;;
       mr ← match getm Tinv c with
       | None =>
           mr <$ uniform Ciph_N ;;
-          T ← get table_location ;;
-          #put table_location := (setm T mr c) ;;
-          #put invtable_location := (setm Tinv c mr) ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T mr c ;;
+          #put Tinv_loc := setm Tinv c mr ;;
           ret mr
-      | Some mr =>
-          ret mr
+      | Some mr => ret mr
       end ;;
       let (m, r) := ciph_to_pair mr in
-      #put keyset_location := (setm R r tt) ;;
+      #put R_loc := setm R r tt ;;
       ret m
     }
   ].
 
-Definition CTXT_HYB_locs_2 := (fset [:: cipherset_location; table_location; invtable_location; altinvtable_location]).
+Definition CTXT_HYB_locs_2 := (fset [:: S_loc; T_loc; Tinv_loc; Tinv'_loc]).
 
 (**
   This is where the proof diverges from the book. The proof in the book removes
@@ -595,30 +592,29 @@ Definition CTXT_HYB_pkg_2:
     #def #[ctxt] (m: 'word): 'ciph {
       r <$ uniform Key_N ;;
       let mr := mkciph m r in
-      T ← get table_location ;;
+      T ← get T_loc ;;
       c <$ uniform Ciph_N ;;
-      Tinv ← get invtable_location ;;
-      S ← get cipherset_location ;;
-      #put table_location := (setm T mr c) ;;
-      #put invtable_location := (setm Tinv c mr) ;;
-      #put cipherset_location := (setm S c tt) ;;
+      Tinv ← get Tinv_loc ;;
+      S ← get S_loc ;;
+      #put T_loc := setm T mr c ;;
+      #put Tinv_loc := setm Tinv c mr ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      Tinv ← get invtable_location ;;
-      Tinv' ← get altinvtable_location ;;
+      Tinv ← get Tinv_loc ;;
+      Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv c with
       | None =>
           mr <$ uniform Ciph_N ;;
-          T ← get table_location ;;
-          #put table_location := (setm T mr c) ;;
-          #put invtable_location := (setm Tinv c mr) ;;
-          #put altinvtable_location := (setm Tinv' c mr) ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T mr c ;;
+          #put Tinv_loc := setm Tinv c mr ;;
+          #put Tinv'_loc := setm Tinv' c mr ;;
           ret mr
-      | Some mr =>
-          ret mr
+      | Some mr => ret mr
       end ;;
       let (m, r) := ciph_to_pair mr in
       ret m
@@ -635,37 +631,36 @@ Definition CTXT_HYB_pkg_3:
     #def #[ctxt] (m: 'word): 'ciph {
       r <$ uniform Key_N ;;
       let mr := mkciph m r in
-      T ← get table_location ;;
+      T ← get T_loc ;;
       c <$ uniform Ciph_N ;;
-      Tinv ← get invtable_location ;;
-      S ← get cipherset_location ;;
-      #put table_location := (setm T mr c) ;;
-      #put invtable_location := (setm Tinv c mr) ;;
-      #put cipherset_location := (setm S c tt) ;;
+      Tinv ← get Tinv_loc ;;
+      S ← get S_loc ;;
+      #put T_loc := setm T mr c ;;
+      #put Tinv_loc := setm Tinv c mr ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      Tinv ← get invtable_location ;;
-      Tinv' ← get altinvtable_location ;;
+      Tinv ← get Tinv_loc ;;
+      Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv' c with
       | None =>
           mr <$ uniform Ciph_N ;;
-          T ← get table_location ;;
-          #put table_location := (setm T mr c) ;;
-          #put invtable_location := (setm Tinv c mr) ;;
-          #put altinvtable_location := (setm Tinv' c mr) ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T mr c ;;
+          #put Tinv_loc := setm Tinv c mr ;;
+          #put Tinv'_loc := setm Tinv' c mr ;;
           ret mr
-      | Some mr =>
-          ret mr
+      | Some mr => ret mr
       end ;;
       let (m, r) := ciph_to_pair mr in
       ret m
     }
   ].
 
-Definition CTXT_HYB_locs_4 := (fset [:: cipherset_location; invtable_location; altinvtable_location]).
+Definition CTXT_HYB_locs_4 := (fset [:: S_loc; Tinv_loc; Tinv'_loc]).
 
 Definition CTXT_HYB_pkg_4:
   package CTXT_HYB_locs_4
@@ -678,23 +673,22 @@ Definition CTXT_HYB_pkg_4:
       r <$ uniform Key_N ;;
       let mr := mkciph m r in
       c <$ uniform Ciph_N ;;
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      Tinv ← get invtable_location ;;
-      Tinv' ← get altinvtable_location ;;
+      Tinv ← get Tinv_loc ;;
+      Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv' c with
       | None =>
           mr <$ uniform Ciph_N ;;
-          #put invtable_location := (setm Tinv c mr) ;;
-          #put altinvtable_location := (setm Tinv' c mr) ;;
+          #put Tinv_loc := setm Tinv c mr ;;
+          #put Tinv'_loc := setm Tinv' c mr ;;
           ret mr
-      | Some mr =>
-          ret mr
+      | Some mr => ret mr
       end ;;
       let (m, r) := ciph_to_pair mr in
       ret m
@@ -712,23 +706,22 @@ Definition CTXT_HYB_pkg_5:
       r <$ uniform Key_N ;;
       let mr := mkciph m r in
       c <$ uniform Ciph_N ;;
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
-      Tinv ← get invtable_location ;;
-      Tinv' ← get altinvtable_location ;;
+      Tinv ← get Tinv_loc ;;
+      Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv c with
       | None =>
           mr <$ uniform Ciph_N ;;
-          #put invtable_location := (setm Tinv c mr) ;;
-          #put altinvtable_location := (setm Tinv' c mr) ;;
+          #put Tinv_loc := setm Tinv c mr ;;
+          #put Tinv'_loc := setm Tinv' c mr ;;
           ret mr
-      | Some mr =>
-          ret mr
+      | Some mr => ret mr
       end ;;
       let (m, r) := ciph_to_pair mr in
       ret m
@@ -746,13 +739,13 @@ Definition CTXT_EVAL_pkg_ff:
   [package
     #def #[ctxt] (m: 'word): 'ciph {
       c <$ uniform Ciph_N ;;
-      S ← get cipherset_location ;;
-      #put cipherset_location := (setm S c tt) ;;
+      S ← get S_loc ;;
+      #put S_loc := setm S c tt ;;
       ret c
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       #import {sig #[invlookup]: 'ciph → 'ciph } as invlookup ;;
-      S ← get cipherset_location ;;
+      S ← get S_loc ;;
       #assert (c \notin (domm S)) ;;
       mr ← invlookup c ;;
       let (m, r) := ciph_to_pair mr in
@@ -779,8 +772,8 @@ Qed.
 Lemma CTXT_EVAL_equiv_true:
   CTXT_EVAL_pkg_tt ∘ EVAL false ≈₀ CTXT_EVAL_SAMP_pkg ∘ EVAL_SAMP false.
 Proof.
-  apply eq_rel_perf_ind_ignore with (fset1 keyset_location).
-  1: by rewrite /CTXT_EVAL_SAMP_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
+  apply eq_rel_perf_ind_ignore with (fset [:: R_loc]).
+  1: by rewrite -fset1E /CTXT_EVAL_SAMP_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
   simplify_eq_rel m.
   all: simplify_linking.
   all: ssprove_code_simpl.
@@ -789,47 +782,38 @@ Proof.
   all: ssprove_code_simpl_more.
   all: apply: r_get_remember_rhs => R.
   - ssprove_sync=> r.
-    ssprove_sync=> [|T];
-      first by rewrite in_fset1; apply /eqP.
+    ssprove_sync=> T.
     case: (getm T (mkciph m r)) => [c|].
-    + ssprove_sync=> [|S];
-        first by rewrite in_fset1; apply /eqP.
+    + ssprove_sync=> S.
       ssprove_sync.
       shelve.
     + ssprove_code_simpl_more.
       rewrite domm_fset_to_chset.
       ssprove_sync=> H1.
       ssprove_sync=> c.
-      ssprove_sync=> [|Tinv];
-        first by rewrite in_fset1; apply /eqP.
+      ssprove_sync=> Tinv.
       ssprove_swap_seq_lhs [:: 1; 0].
       ssprove_swap_seq_rhs [:: 1; 0].
-      ssprove_sync=> [|S];
-        first by rewrite in_fset1; apply /eqP.
+      ssprove_sync=> S.
       do 3 ssprove_sync.
       shelve.
-  - ssprove_sync=> [|S];
-      first by rewrite in_fset1; apply /eqP.
+  - ssprove_sync=> S.
     ssprove_sync=> H1.
-    ssprove_sync=> [|Tinv];
-      first by rewrite in_fset1; apply /eqP.
+    ssprove_sync=> Tinv.
     case: (getm Tinv m) => [c|].
     + shelve.
     + ssprove_code_simpl_more.
       rewrite domm_fset_to_chset.
       ssprove_sync=> H2.
       ssprove_sync=> c.
-      ssprove_sync=> [|T];
-        first by rewrite in_fset1; apply /eqP.
+      ssprove_sync=> T.
       do 2 ssprove_sync.
       shelve.
     Unshelve.
     all: apply: r_put_rhs.
     all: ssprove_restore_mem;
       last by apply: r_ret.
-    all: move=> s0 s1 /= [Hinv _] L H.
-    all: rewrite Hinv => //.
-    all: by rewrite -get_heap_set_heap // -in_fset1.
+    all: by ssprove_invariant.
 Qed.
 
 Lemma CTXT_HYB_equiv_1:
@@ -837,7 +821,7 @@ Lemma CTXT_HYB_equiv_1:
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    couple_rhs table_location keyset_location
+    couple_rhs T_loc R_loc
       (fun T R => forall m r,
         r \notin (domm R) -> getm T (mkciph m r) = None)
   ).
@@ -854,7 +838,7 @@ Proof.
   - ssprove_sync=> H1.
     ssprove_sync=> r.
     apply: r_get_vs_get_remember => T.
-    apply: (r_rem_couple_rhs table_location keyset_location) => Hinv.
+    apply: (r_rem_couple_rhs T_loc R_loc) => Hinv.
     rewrite Hinv -?in_compl ?sample_subset_in //.
     ssprove_sync=> c.
     ssprove_sync=> [|Tinv];
@@ -887,7 +871,7 @@ Proof.
       by rewrite Hinv.
     + ssprove_sync=> c.
       apply: r_get_vs_get_remember => T.
-      apply: (r_rem_couple_rhs table_location keyset_location) => Hinv.
+      apply: (r_rem_couple_rhs T_loc R_loc) => Hinv.
       do 3 apply: r_put_vs_put.
       all: ssprove_restore_mem;
         last by apply: r_ret.
@@ -902,7 +886,7 @@ Qed.
 Lemma CTXT_HYB_equiv_2:
   CTXT_HYB_pkg_1 ∘ SAMP Key_N true ≈₀ CTXT_HYB_pkg_2.
 Proof.
-  apply eq_rel_perf_ind_ignore with (keyset_location |: fset1 altinvtable_location).
+  apply eq_rel_perf_ind_ignore with (R_loc |: fset1 Tinv'_loc).
   1: by rewrite fsubU1set /CTXT_HYB_locs_1 /CTXT_HYB_locs_2 fsub1set !fset_cons !in_fsetU !in_fset1 !eq_refl !Bool.orb_true_r.
   simplify_eq_rel m.
   all: ssprove_code_simpl.
@@ -944,7 +928,7 @@ Lemma CTXT_HYB_equiv_3:
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    triple_rhs cipherset_location invtable_location altinvtable_location
+    triple_rhs S_loc Tinv_loc Tinv'_loc
       (fun S Tinv Tinv' => forall c,
         c \notin domm S -> getm Tinv c = getm Tinv' c)
   ).
@@ -981,7 +965,7 @@ Proof.
     ssprove_sync=> H1.
     apply: r_get_vs_get_remember => Tinv.
     apply: r_get_vs_get_remember => Tinv'.
-    apply: (r_rem_triple_rhs cipherset_location invtable_location altinvtable_location) => Hinv.
+    apply: (r_rem_triple_rhs S_loc Tinv_loc Tinv'_loc) => Hinv.
     rewrite Hinv //.
     case: (Tinv' m) => [c|].
     1: {
@@ -1010,7 +994,7 @@ Qed.
 Lemma CTXT_HYB_equiv_4:
   CTXT_HYB_pkg_3 ≈₀ CTXT_HYB_pkg_4.
 Proof.
-  apply eq_rel_perf_ind_ignore with (table_location |: fset1 invtable_location).
+  apply eq_rel_perf_ind_ignore with (T_loc |: fset1 Tinv_loc).
   1: by rewrite fsubU1set /CTXT_HYB_locs_2 fsub1set !fset_cons !in_fsetU !in_fset1 !eq_refl !Bool.orb_true_r.
   simplify_eq_rel m.
   all: ssprove_code_simpl.
@@ -1050,7 +1034,7 @@ Lemma CTXT_HYB_equiv_5:
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    couple_rhs invtable_location altinvtable_location eq
+    couple_rhs Tinv_loc Tinv'_loc eq
   ).
   1: {
     ssprove_invariant=> //.
@@ -1058,12 +1042,12 @@ Proof.
   }
   simplify_eq_rel m.
   1: {
-    apply: (@r_reflexivity_alt _ (fset [:: cipherset_location; keyset_location])) => [L H|L v H].
+    apply: (@r_reflexivity_alt _ (S_loc |: fset1 R_loc)) => [loc H|loc v H].
     all: ssprove_invariant;
       first by move=> ? ? ->.
-    all: rewrite !fset_cons !in_fsetU !in_fset1 -fset0E in_fset0 in H.
+    all: rewrite in_fsetU !in_fset1 in H.
     all: apply /eqP.
-    all: by move: H => /orP [/eqP|/orP [/eqP|//]] ->.
+    all: by move: H => /orP [/eqP|/eqP] ->.
   }
   ssprove_code_simpl.
   ssprove_code_simpl_more.
@@ -1072,7 +1056,7 @@ Proof.
   ssprove_sync=> H1.
   apply: r_get_vs_get_remember => Tinv.
   apply: r_get_vs_get_remember => Tinv'.
-  apply: (r_rem_couple_rhs invtable_location altinvtable_location) => ->.
+  apply: (r_rem_couple_rhs Tinv_loc Tinv'_loc) => ->.
   case: (getm Tinv' m) => [c|].
   + ssprove_forget_all.
     by apply: r_ret.
@@ -1086,19 +1070,18 @@ Qed.
 Lemma CTXT_HYB_equiv_6:
   CTXT_HYB_pkg_5 ≈₀ CTXT_EVAL_pkg_ff ∘ EVAL_SAMP_pkg ∘ SAMP Ciph_N true.
 Proof.
-  apply eq_rel_perf_ind_ignore with (table_location |: fset1 altinvtable_location).
+  apply eq_rel_perf_ind_ignore with (T_loc |: fset1 Tinv'_loc).
   1: by rewrite !fsubU1set /CTXT_HYB_locs_4 /EVAL_locs_ff fsub1set !fset_cons !in_fsetU !in_fset1 !eq_refl !Bool.orb_true_r /=.
   simplify_eq_rel m.
   all: ssprove_code_simpl.
   all: ssprove_code_simpl.
   all: ssprove_code_simpl_more.
   - apply: r_dead_sample_L.
-    apply: (@r_reflexivity_alt _ (fset1 cipherset_location)) => [L H|L v H].
+    apply: (@r_reflexivity_alt _ (fset1 S_loc)) => [loc H|loc v H].
     all: ssprove_invariant.
     rewrite in_fset1 in H.
     move /eqP in H.
-    rewrite H.
-    rewrite in_fsetU !in_fset1.
+    rewrite H in_fsetU !in_fset1.
     apply /norP.
     split.
     all: by apply /eqP.

@@ -68,9 +68,9 @@ Notation " 'word " := (Word) (at level 2): package_scope.
 
 Context (PRF: Word -> Word -> Word).
 
-Definition key_location: Location := ('option 'word ; 0).
-Definition table_location: Location := (chMap 'word 'word ; 1).
-Definition count_location: Location := ('nat ; 2).
+Definition k_loc: Location := ('option 'word ; 0).
+Definition T_loc: Location := (chMap 'word 'word ; 1).
+Definition count_loc: Location := ('nat ; 2).
 Definition query: nat := 3.
 Definition lookup: nat := 4.
 
@@ -78,27 +78,35 @@ Definition mkpair {Lt Lf E}
   (t: package Lt [interface] E) (f: package Lf [interface] E):
   loc_GamePair E := fun b => if b then {locpackage t} else {locpackage f}.
 
-Definition EVAL_locs_tt := fset [:: key_location].
-Definition EVAL_locs_ff := fset [:: table_location].
+Definition EVAL_locs_tt := fset [:: k_loc].
+Definition EVAL_locs_ff := fset [:: T_loc].
 
-Definition kgen {L} (_: key_location \in L): code L [interface] 'word :=
-  {code
-    k_init ← get key_location ;;
-    match k_init with
-    | None =>
-        k <$ uniform Word_N ;;
-        #put key_location := Some k ;;
-        ret k
-    | Some k =>
-        ret k
-    end
-  }.
+Definition kgen: raw_code 'word :=
+  k_init ← get k_loc ;;
+  match k_init with
+  | None =>
+      k <$ uniform Word_N ;;
+      #put k_loc := Some k ;;
+      ret k
+  | Some k => ret k
+  end.
 
-Lemma EVAL_locs_tt_key:
-  key_location \in EVAL_locs_tt.
+Lemma kgen_valid {L I}:
+  k_loc \in L ->
+  ValidCode L I kgen.
 Proof.
-  auto_in_fset.
+  move=> H.
+  apply: valid_getr => [// | [k|]].
+  1: by apply: valid_ret.
+  apply: valid_sampler => k.
+  apply: valid_putr => //.
+  by apply: valid_ret => //.
 Qed.
+
+Hint Extern 1 (ValidCode ?L ?I kgen) =>
+  eapply kgen_valid ;
+  auto_in_fset
+  : typeclass_instances ssprove_valid_db.
 
 Definition EVAL_pkg_tt:
   package EVAL_locs_tt
@@ -106,7 +114,7 @@ Definition EVAL_pkg_tt:
     [interface #val #[lookup]: 'word → 'word ] :=
   [package
     #def #[lookup] (m: 'word): 'word {
-      k ← kgen EVAL_locs_tt_key ;;
+      k ← kgen ;;
       ret (PRF k m)
     }
   ].
@@ -117,14 +125,13 @@ Definition EVAL_pkg_ff:
     [interface #val #[lookup]: 'word → 'word ] :=
   [package
     #def #[lookup] (m: 'word): 'word {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       match getm T m with
       | None =>
           r <$ uniform Word_N ;;
-          #put table_location := (setm T m r) ;;
+          #put T_loc := setm T m r ;;
           ret r
-      | Some r =>
-          ret r
+      | Some r => ret r
       end
     }
   ].
@@ -154,7 +161,7 @@ Definition GEN_pkg_ff:
 
 Definition GEN := mkpair GEN_pkg_tt GEN_pkg_ff.
 
-Definition HYB_locs := fset [:: count_location ].
+Definition HYB_locs := fset [:: count_loc ].
 
 (**
   Defining the hybrid proofs is surprisingly simple: We can just take [i] as a
@@ -170,8 +177,8 @@ Definition HYB_pkg i:
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
     #def #[query] (_: 'unit): 'word × 'word {
-      count ← get count_location ;;
-      #put count_location := count.+1 ;;
+      count ← get count_loc ;;
+      #put count_loc := count.+1 ;;
       if count < i then
         r1 <$ uniform Word_N ;;
         r2 <$ uniform Word_N ;;
@@ -189,8 +196,8 @@ Definition HYB_EVAL_pkg i:
   [package
     #def #[query] (_: 'unit): 'word × 'word {
       #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      count ← get count_location ;;
-      #put count_location := count.+1 ;;
+      count ← get count_loc ;;
+      #put count_loc := count.+1 ;;
       if count < i then
         x <$ uniform Word_N ;;
         y <$ uniform Word_N ;;
@@ -218,17 +225,15 @@ Definition EVAL_HYB_pkg:
 Lemma GEN_equiv_true:
   GEN true ≈₀ HYB_pkg 0.
 Proof.
-  apply eq_rel_perf_ind_ignore with (fset1 count_location).
-  1: by rewrite /HYB_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
+  apply eq_rel_perf_ind_ignore with (fset [:: count_loc]).
+  1: by rewrite -fset1E /HYB_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
   simplify_eq_rel m.
   apply: r_get_remember_rhs => count.
-  ssprove_swap_rhs 0.
-  ssprove_sync=> s.
   apply: r_put_rhs.
+  ssprove_sync=> s.
   ssprove_restore_mem;
     last by apply: r_ret.
-  move=> s0 s1 [Hinv B] l H.
-  by rewrite get_set_heap_neq ?Hinv // -in_fset1.
+  by ssprove_invariant.
 Qed.
 
 (**
@@ -239,8 +244,8 @@ Lemma GEN_HYB_equiv i:
   HYB_pkg i ≈₀ HYB_EVAL_pkg i ∘ EVAL true.
 Proof.
   apply eq_rel_perf_ind with (
-    (heap_ignore (fset1 key_location)) ⋊
-    couple_rhs count_location key_location
+    (heap_ignore (fset1 k_loc)) ⋊
+    couple_rhs count_loc k_loc
       (fun count k => count <= i -> k = None)
     ).
   1: {
@@ -255,7 +260,7 @@ Proof.
   - rewrite Heq eq_refl ltnn /=.
     ssprove_swap_rhs 0.
     apply: r_get_remember_rhs => k.
-    apply: (r_rem_couple_rhs count_location key_location) => Hinv.
+    apply: (r_rem_couple_rhs count_loc k_loc) => Hinv.
     rewrite Hinv //.
     apply: r_put_vs_put.
     ssprove_sync=> s.
@@ -269,9 +274,9 @@ Proof.
       last by apply: r_ret.
     ssprove_invariant.
     2: by rewrite -subnE subSnn.
-    move {Hinv k Heq} => s0 s1 [[[Hinv _] _] _] l H.
-    rewrite (get_set_heap_neq _ key_location) -?in_fset1 //.
-    case: (eq_dec l count_location)=> Heq.
+    move {Hinv k Heq} => s0 s1 [[[Hinv _] _] _] loc H.
+    rewrite (get_set_heap_neq _ k_loc) -?in_fset1 //.
+    case: (eq_dec loc count_loc)=> Heq.
     + by rewrite Heq !get_set_heap_eq.
     + move /eqP in Heq.
       by rewrite !get_set_heap_neq // Hinv.
@@ -301,8 +306,8 @@ Lemma GEN_HYB_EVAL_equiv i:
   HYB_EVAL_pkg i ∘ EVAL false ≈₀ HYB_pkg i.+1.
 Proof.
   apply eq_rel_perf_ind with (
-    (heap_ignore (fset1 table_location)) ⋊
-    couple_lhs count_location table_location
+    (heap_ignore (fset1 T_loc)) ⋊
+    couple_lhs count_loc T_loc
       (fun count T => count <= i -> T = emptym)
     ).
   1: {
@@ -317,7 +322,7 @@ Proof.
   - rewrite Heq eq_refl ltnn ltnSn /=.
     ssprove_swap_lhs 0.
     apply: r_get_remember_lhs => T.
-    apply: (r_rem_couple_lhs count_location table_location) => Hinv.
+    apply: (r_rem_couple_lhs count_loc T_loc) => Hinv.
     rewrite Hinv //=.
     apply: r_put_vs_put.
     ssprove_sync=> r1.
@@ -334,9 +339,9 @@ Proof.
       last by apply: r_ret.
     ssprove_invariant.
     2: by rewrite -subnE subSnn.
-    move {Hinv T Heq} => s0 s1 [[[Hinv A] B] C] l H /=.
-    rewrite !(get_set_heap_neq _ table_location) -?in_fset1 //.
-    case: (eq_dec l count_location)=> Heq.
+    move {Hinv T Heq} => s0 s1 [[[Hinv A] B] C] loc H /=.
+    rewrite !(get_set_heap_neq _ T_loc) -?in_fset1 //.
+    case: (eq_dec loc count_loc)=> Heq.
     + by rewrite Heq !get_set_heap_eq.
     + move /eqP in Heq.
       by rewrite !get_set_heap_neq // Hinv.

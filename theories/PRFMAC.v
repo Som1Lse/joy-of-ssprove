@@ -1,7 +1,7 @@
 (**
   This formalises Claim 10.4 from "The Joy of Cryptography" (p. 188).
   Most of it is fairly straight forward, the longest part being
-  [TAG_GUESS_equiv_2].
+  [TAG_GUESS_equiv_3].
 
   It would also be nice to formalise Claim 10.3 (p. 186), but its argument
   depends on the adversary only having polynomial time, and how to formulate
@@ -67,10 +67,9 @@ Notation " 'word " := (Word) (at level 2): package_scope.
 
 #[local] Open Scope package_scope.
 
-(* TODO: macset_location? Call it [S]? *)
-Definition key_location: Location := ('option 'word ; 0).
-Definition table_location: Location := (chMap 'word 'word ; 1).
-Definition mac_set_location: Location := ('set ('word × 'word) ; 2).
+Definition k_loc: Location := ('option 'word ; 0).
+Definition T_loc: Location := (chMap 'word 'word ; 1).
+Definition S_loc: Location := ('set ('word × 'word) ; 2).
 Definition lookup: nat := 3.
 Definition encrypt: nat := 4.
 Definition gettag: nat := 5.
@@ -83,27 +82,35 @@ Definition mkpair {Lt Lf E}
 
 Context (PRF: Word -> Word -> Word).
 
-Definition EVAL_locs_tt := fset [:: key_location].
-Definition EVAL_locs_ff := fset [:: table_location].
+Definition EVAL_locs_tt := fset [:: k_loc].
+Definition EVAL_locs_ff := fset [:: T_loc].
 
-Definition kgen {L} (_: key_location \in L): code L [interface] 'word :=
-  {code
-    k_init ← get key_location ;;
-    match k_init with
-    | None =>
-        k <$ uniform Word_N ;;
-        #put key_location := Some k ;;
-        ret k
-    | Some k =>
-        ret k
-    end
-  }.
+Definition kgen: raw_code 'word :=
+  k_init ← get k_loc ;;
+  match k_init with
+  | None =>
+      k <$ uniform Word_N ;;
+      #put k_loc := Some k ;;
+      ret k
+  | Some k => ret k
+  end.
 
-Lemma EVAL_locs_tt_key:
-  key_location \in EVAL_locs_tt.
+Lemma kgen_valid {L I}:
+  k_loc \in L ->
+  ValidCode L I kgen.
 Proof.
-  auto_in_fset.
+  move=> H.
+  apply: valid_getr => [// | [k|]].
+  1: by apply: valid_ret.
+  apply: valid_sampler => k.
+  apply: valid_putr => //.
+  by apply: valid_ret => //.
 Qed.
+
+Hint Extern 1 (ValidCode ?L ?I kgen) =>
+  eapply kgen_valid ;
+  auto_in_fset
+  : typeclass_instances ssprove_valid_db.
 
 Definition EVAL_pkg_tt:
   package EVAL_locs_tt
@@ -111,7 +118,7 @@ Definition EVAL_pkg_tt:
     [interface #val #[lookup]: 'word → 'word ] :=
   [package
     #def #[lookup] (m: 'word): 'word {
-      k ← kgen EVAL_locs_tt_key ;;
+      k ← kgen ;;
       ret (PRF k m)
     }
   ].
@@ -122,21 +129,20 @@ Definition EVAL_pkg_ff:
     [interface #val #[lookup]: 'word → 'word ] :=
   [package
     #def #[lookup] (m: 'word): 'word {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       match getm T m with
       | None =>
           r <$ uniform Word_N ;;
-          #put table_location := (setm T m r) ;;
+          #put T_loc := setm T m r ;;
           ret r
-      | Some r =>
-          ret r
+      | Some r => ret r
       end
     }
   ].
 
 Definition EVAL := mkpair EVAL_pkg_tt EVAL_pkg_ff.
 
-Definition GUESS_locs := fset [:: table_location].
+Definition GUESS_locs := fset [:: T_loc].
 
 Definition GUESS_pkg_tt:
   package GUESS_locs
@@ -146,25 +152,23 @@ Definition GUESS_pkg_tt:
       #val #[guess]: 'word × 'word → 'bool ] :=
   [package
     #def #[lookup] (m: 'word): 'word {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       match getm T m with
       | None =>
           t <$ uniform Word_N ;;
-          #put table_location := (setm T m t) ;;
+          #put T_loc := setm T m t ;;
           ret t
-      | Some t =>
-          ret t
+      | Some t => ret t
       end
     } ;
     #def #[guess] ('(m, t): 'word × 'word): 'bool {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       r ← match getm T m with
       | None =>
           r <$ uniform Word_N ;;
-          #put table_location := (setm T m r) ;;
+          #put T_loc := setm T m r ;;
           ret r
-      | Some r =>
-          ret r
+      | Some r => ret r
       end ;;
       ret (t == r)
     }
@@ -178,32 +182,25 @@ Definition GUESS_pkg_ff:
       #val #[guess]: 'word × 'word → 'bool ] :=
   [package
     #def #[lookup] (m: 'word): 'word {
-      T ← get table_location ;;
+      T ← get T_loc ;;
       match getm T m with
       | None =>
           t <$ uniform Word_N ;;
-          #put table_location := (setm T m t) ;;
+          #put T_loc := setm T m t ;;
           ret t
-      | Some t =>
-          ret t
+      | Some t => ret t
       end
     } ;
     #def #[guess] ('(m, t): 'word × 'word): 'bool {
-      T ← get table_location ;;
-      ret (getm T m == Some t)
+      T ← get T_loc ;;
+      ret (Some t == getm T m)
     }
   ].
 
 Definition GUESS := mkpair GUESS_pkg_tt GUESS_pkg_ff.
 
-Definition TAG_locs_tt := fset [:: key_location].
-Definition TAG_locs_ff := fset [:: key_location; mac_set_location].
-
-Lemma TAG_locs_tt_key:
-  key_location \in TAG_locs_tt.
-Proof.
-  auto_in_fset.
-Qed.
+Definition TAG_locs_tt := fset [:: k_loc].
+Definition TAG_locs_ff := fset [:: k_loc; S_loc].
 
 Definition TAG_pkg_tt:
   package TAG_locs_tt
@@ -213,20 +210,14 @@ Definition TAG_pkg_tt:
       #val #[checktag]: 'word × 'word → 'bool ] :=
   [package
     #def #[gettag] (m: 'word): 'word {
-      k ← kgen TAG_locs_tt_key ;;
+      k ← kgen ;;
       ret (PRF k m)
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      k ← kgen TAG_locs_tt_key ;;
-      ret (t == (PRF k m))
+      k ← kgen ;;
+      ret (t == PRF k m)
     }
   ].
-
-Lemma TAG_locs_ff_key:
-  key_location \in TAG_locs_ff.
-Proof.
-  auto_in_fset.
-Qed.
 
 Definition TAG_pkg_ff:
   package TAG_locs_ff
@@ -236,23 +227,23 @@ Definition TAG_pkg_ff:
       #val #[checktag]: 'word × 'word → 'bool ] :=
   [package
     #def #[gettag] (m: 'word): 'word {
-      S ← get mac_set_location ;;
-      k ← kgen TAG_locs_ff_key ;;
+      S ← get S_loc ;;
+      k ← kgen ;;
       let t := PRF k m in
-      #put mac_set_location := (setm S (m, t) tt) ;;
+      #put S_loc := setm S (m, t) tt ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      S ← get mac_set_location ;;
+      S ← get S_loc ;;
       ret ((m, t) \in domm S)
     }
   ].
 
 Definition TAG := mkpair TAG_pkg_tt TAG_pkg_ff.
 
-Definition EVAL_TAG_locs_ff := fset [:: mac_set_location].
+Definition TAG_EVAL_locs_ff := fset [:: S_loc].
 
-Definition EVAL_TAG_pkg_tt:
+Definition TAG_EVAL_pkg_tt:
   package fset0
     [interface #val #[lookup]: 'word → 'word ]
     [interface
@@ -271,8 +262,8 @@ Definition EVAL_TAG_pkg_tt:
     }
   ].
 
-Definition EVAL_TAG_pkg_ff:
-  package EVAL_TAG_locs_ff
+Definition TAG_EVAL_pkg_ff:
+  package TAG_EVAL_locs_ff
     [interface #val #[lookup]: 'word → 'word]
     [interface
       #val #[gettag]: 'word → 'word ;
@@ -280,41 +271,20 @@ Definition EVAL_TAG_pkg_ff:
   [package
     #def #[gettag] (m: 'word): 'word {
       #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      S ← get mac_set_location ;;
+      S ← get S_loc ;;
       t ← lookup m ;;
-      #put mac_set_location := (setm S (m, t) tt) ;;
+      #put S_loc := setm S (m, t) tt ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      S ← get mac_set_location ;;
+      S ← get S_loc ;;
       ret ((m, t) \in domm S)
     }
   ].
 
-Definition TAG_GUESS_locs := fset [:: mac_set_location ].
+Definition TAG_GUESS_locs := fset [:: S_loc ].
 
-Definition TAG_GUESS_pkg_0:
-  package fset0
-    [interface
-      #val #[lookup]: 'word → 'word ;
-      #val #[guess]: 'word × 'word → 'bool ]
-    [interface
-      #val #[gettag]: 'word → 'word ;
-      #val #[checktag]: 'word × 'word → 'bool ] :=
-  [package
-    #def #[gettag] (m: 'word): 'word {
-      #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      t ← lookup m ;;
-      ret t
-    } ;
-    #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      #import {sig #[guess]: 'word × 'word → 'bool } as guess ;;
-      r ← guess (m, t) ;;
-      ret r
-    }
-  ].
-
-Definition TAG_GUESS_pkg_1:
+Definition TAG_GUESS_pkg:
   package TAG_GUESS_locs
     [interface
       #val #[lookup]: 'word → 'word ;
@@ -325,42 +295,20 @@ Definition TAG_GUESS_pkg_1:
   [package
     #def #[gettag] (m: 'word): 'word {
       #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      S ← get mac_set_location ;;
+      S ← get S_loc ;;
       t ← lookup m ;;
-      #put mac_set_location := (setm S (m, t) tt) ;;
+      #put S_loc := setm S (m, t) tt ;;
       ret t
     } ;
     #def #[checktag] ('(m, t): 'word × 'word): 'bool {
       #import {sig #[guess]: 'word × 'word → 'bool } as guess ;;
       r ← guess (m, t) ;;
       ret r
-    }
-  ].
-
-Definition TAG_GUESS_pkg_2:
-  package TAG_GUESS_locs
-    [interface
-      #val #[lookup]: 'word → 'word ;
-      #val #[guess]: 'word × 'word → 'bool ]
-    [interface
-      #val #[gettag]: 'word → 'word ;
-      #val #[checktag]: 'word × 'word → 'bool ] :=
-  [package
-    #def #[gettag] (m: 'word): 'word {
-      #import {sig #[lookup]: 'word → 'word } as lookup ;;
-      S ← get mac_set_location ;;
-      t ← lookup m ;;
-      #put mac_set_location := (setm S (m, t) tt) ;;
-      ret t
-    } ;
-    #def #[checktag] ('(m, t): 'word × 'word): 'bool {
-      S ← get mac_set_location ;;
-      ret ((m, t) \in domm S)
     }
   ].
 
 Lemma TAG_equiv_true:
-  TAG true ≈₀ EVAL_TAG_pkg_tt ∘ EVAL true.
+  TAG true ≈₀ TAG_EVAL_pkg_tt ∘ EVAL true.
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
@@ -374,22 +322,10 @@ Proof.
   all: by apply: rreflexivity_rule.
 Qed.
 
-Lemma TAG_GUESS_equiv_0:
-  EVAL_TAG_pkg_tt ∘ EVAL false ≈₀ TAG_GUESS_pkg_0 ∘ GUESS true.
+Lemma TAG_EVAL_equiv_true:
+  TAG_EVAL_pkg_tt ∘ EVAL false ≈₀ TAG_GUESS_pkg ∘ GUESS true.
 Proof.
-  apply: eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
-    last by move=> [? ?] [? ?] [].
-  all: simplify_linking.
-  2: ssprove_code_simpl.
-  all: by apply rreflexivity_rule.
-Qed.
-
-Lemma TAG_GUESS_equiv_1:
-  TAG_GUESS_pkg_0 ∘ GUESS false ≈₀ TAG_GUESS_pkg_1 ∘ GUESS false.
-Proof.
-  apply eq_rel_perf_ind_ignore with TAG_GUESS_locs.
+  apply eq_rel_perf_ind_ignore with (fset [:: S_loc]).
   1: {
     apply: fsubset_trans.
     - by apply fsubsetUl.
@@ -398,20 +334,22 @@ Proof.
   simplify_eq_rel m.
   2: case: m => [m t].
   all: simplify_linking.
-  - apply: r_get_remember_rhs => S.
-    ssprove_sync=> T.
-    case: (getm T m) => [k|].
-    all: simpl.
-    2: ssprove_sync=> t.
-    2: ssprove_sync.
-    all: apply: r_put_rhs.
-    all: ssprove_restore_mem;
-      last by apply: r_ret.
+  all: simplify_linking.
+  all: ssprove_code_simpl.
+  all: ssprove_code_simpl_more.
+  2: {
+    apply: (@r_reflexivity_alt _ (fset1 T_loc)).
     all: by ssprove_invariant.
-  - simplify_linking.
-    ssprove_sync=> T.
-    case: (getm T m) => [k|].
-    all: by apply: r_ret.
+  }
+  1: apply: r_get_remember_rhs => S.
+  ssprove_sync=> T.
+  case (getm T _) => [t|].
+  2: ssprove_sync=> t.
+  2: ssprove_sync.
+  all: apply: r_put_rhs.
+  all: ssprove_restore_mem;
+    last by apply: r_ret.
+  all: by ssprove_invariant.
 Qed.
 
 (**
@@ -419,24 +357,24 @@ Qed.
   It turns out, however, to be pretty complicated since we need to prove the
   invariant holds.
 *)
-Lemma TAG_GUESS_equiv_2:
-  TAG_GUESS_pkg_1 ∘ GUESS false ≈₀ TAG_GUESS_pkg_2 ∘ GUESS false.
+Lemma TAG_EVAL_equiv_false:
+  TAG_GUESS_pkg ∘ GUESS false ≈₀ TAG_EVAL_pkg_ff ∘ EVAL false.
 Proof.
   apply eq_rel_perf_ind with (
     (fun '(h0, h1) => h0 = h1) ⋊
-    couple_rhs table_location mac_set_location
+    couple_rhs T_loc S_loc
       (fun T S => forall m t,
-        ((m, t) \in domm S) = (getm T m == Some t))
+        ((m, t) \in domm S) = (Some t == getm T m))
   ).
   1: {
     ssprove_invariant=> /=.
-    1,2: by rewrite /GUESS_locs /TAG_GUESS_locs !fset_cons !in_fsetU !in_fset1 eq_refl Bool.orb_true_r.
+    1,2: by rewrite /GUESS_locs /TAG_GUESS_locs !fset_cons !in_fsetU !in_fset1 eq_refl ?Bool.orb_true_r.
     move=> m t.
     by rewrite domm0 in_fset0 get_empty_heap emptymE.
   }
   simplify_eq_rel m.
   2: case: m => [m t].
-  all: simpl.
+  all: simplify_linking.
   all: simplify_linking.
   - apply: r_get_vs_get_remember => S.
     apply: r_get_vs_get_remember => T.
@@ -453,7 +391,7 @@ Proof.
       * move /eqP /negPf in Heq.
         by rewrite Heq -H1 Hinv.
     + ssprove_sync=> k.
-      apply: (r_rem_couple_rhs table_location mac_set_location) => Hinv.
+      apply: (r_rem_couple_rhs T_loc S_loc) => Hinv.
       apply: r_put_vs_put.
       apply: r_put_vs_put.
       ssprove_restore_mem;
@@ -470,7 +408,6 @@ Proof.
       rewrite xpair_eqE in Heq.
       case: (eq_dec m' m) => Heqm.
       * rewrite Heqm eq_refl /= in Heq*.
-        rewrite eq_sym in Heq.
         by rewrite Heq Hinv Heqt.
       * move /eqP /negPf in Heqm.
         by rewrite Heqm Hinv.
@@ -478,9 +415,9 @@ Proof.
     ssprove_code_simpl_more.
     apply: r_get_remember_lhs => T.
     apply: r_get_remember_rhs => S.
-    apply: (r_rem_couple_rhs table_location mac_set_location) => [|Hinv].
+    apply: (r_rem_couple_rhs T_loc S_loc) => [|Hinv].
     1: by apply: (Remembers_rhs_from_tracked_lhs _).
-    case: (eq_dec (getm T m == Some t) true) => /eqP Heq.
+    case: (eq_dec (Some t == getm T m) true) => /eqP Heq.
     + rewrite Heq eq_refl.
       move /eqP in Heq.
       shelve.
@@ -496,20 +433,8 @@ Proof.
     all: by case: H => [[]].
 Qed.
 
-Lemma TAG_GUESS_equiv:
-  TAG_GUESS_pkg_2 ∘ GUESS false ≈₀ EVAL_TAG_pkg_ff ∘ EVAL false.
-Proof.
-  apply: eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  all: apply rpost_weaken_rule with eq;
-    last by move=> [? ?] [? ?] [].
-  all: simplify_linking.
-  all: ssprove_code_simpl.
-  all: by apply: rreflexivity_rule.
-Qed.
-
 Lemma TAG_equiv_false:
-  EVAL_TAG_pkg_ff ∘ EVAL true ≈₀ TAG false.
+  TAG_EVAL_pkg_ff ∘ EVAL true ≈₀ TAG false.
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
@@ -537,13 +462,7 @@ Definition prf_epsilon := Advantage EVAL.
   This is negligible, but not yet provable in SSProve.
 *)
 Definition statistical_gap :=
-  AdvantageE (TAG_GUESS_pkg_0 ∘ GUESS true) (TAG_GUESS_pkg_0 ∘ GUESS false).
-
-Lemma cat1s' {A} (x y: A) s:
-  [:: x] ++ y :: s = x :: y :: s.
-Proof.
-  by [].
-Qed.
+  AdvantageE (TAG_GUESS_pkg ∘ GUESS true) (TAG_GUESS_pkg ∘ GUESS false).
 
 Theorem security_based_on_prf LA A:
   ValidPackage LA
@@ -554,24 +473,22 @@ Theorem security_based_on_prf LA A:
   fdisjoint LA (
     EVAL_locs_tt :|: EVAL_locs_ff :|: GUESS_locs :|:
     TAG_locs_tt :|: TAG_locs_ff :|:
-    EVAL_TAG_locs_ff :|: TAG_GUESS_locs
+    TAG_EVAL_locs_ff :|: TAG_GUESS_locs
   ) ->
   Advantage TAG A <=
-  prf_epsilon (A ∘ EVAL_TAG_pkg_tt) +
+  prf_epsilon (A ∘ TAG_EVAL_pkg_tt) +
   statistical_gap A +
-  prf_epsilon (A ∘ EVAL_TAG_pkg_ff).
+  prf_epsilon (A ∘ TAG_EVAL_pkg_ff).
 Proof.
   move=> vA H.
   rewrite Advantage_E Advantage_sym.
   ssprove triangle (TAG true) [::
-    EVAL_TAG_pkg_tt ∘ EVAL true   ;
-    EVAL_TAG_pkg_tt ∘ EVAL false  ;
-    TAG_GUESS_pkg_0 ∘ GUESS true  ;
-    TAG_GUESS_pkg_0 ∘ GUESS false ;
-    TAG_GUESS_pkg_1 ∘ GUESS false ;
-    TAG_GUESS_pkg_2 ∘ GUESS false ;
-    EVAL_TAG_pkg_ff ∘ EVAL false  ;
-    EVAL_TAG_pkg_ff ∘ EVAL true
+    TAG_EVAL_pkg_tt ∘ EVAL true   ;
+    TAG_EVAL_pkg_tt ∘ EVAL false  ;
+    TAG_GUESS_pkg ∘ GUESS true  ;
+    TAG_GUESS_pkg ∘ GUESS false ;
+    TAG_EVAL_pkg_ff ∘ EVAL false  ;
+    TAG_EVAL_pkg_ff ∘ EVAL true
   ] (TAG false) A
   as ineq.
   apply: le_trans.
@@ -580,10 +497,8 @@ Proof.
   move: H => /andP [/andP [/andP [/andP [/andP [/andP [H1 H2] H3] H4] H5] H6] H7].
   move: {ineq H1 H2 H3 H4 H5 H6 H7} (H1, H2, H3, H4, H5, H6, H7, fdisjoints0) => H.
   rewrite TAG_equiv_true ?fdisjointUr ?H // GRing.add0r.
-  rewrite TAG_GUESS_equiv_0 ?fdisjointUr ?H // GRing.addr0.
-  rewrite TAG_GUESS_equiv_1 ?fdisjointUr ?H // GRing.addr0.
-  rewrite TAG_GUESS_equiv_2 ?fdisjointUr ?H // GRing.addr0.
-  rewrite TAG_GUESS_equiv ?fdisjointUr ?H // GRing.addr0.
+  rewrite TAG_EVAL_equiv_true ?fdisjointUr ?H // GRing.addr0.
+  rewrite TAG_EVAL_equiv_false ?fdisjointUr ?H // GRing.addr0.
   rewrite TAG_equiv_false ?fdisjointUr ?H // GRing.addr0.
   rewrite Advantage_sym.
   by rewrite /prf_epsilon /statistical_gap !Advantage_E !Advantage_link.

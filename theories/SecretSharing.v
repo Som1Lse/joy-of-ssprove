@@ -156,83 +156,33 @@ Definition chSet t := chMap t 'unit.
 Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
 Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
-Definition share (m: Word):
-  code fset0
-    [interface]
-    (chMap 'nat 'word) :=
-  {code
-    s0 <$ uniform Word_N ;;
-    let s1 := s0 ⊕ m in
-    ret [fmap (0, s0) ; (1, s0 ⊕ m)]
-  }.
+Definition shares: nat := 0.
 
-Definition reconstruct (s0 s1: Word):
-  code fset0
-    [interface]
-    'fin (2^n) :=
-  {code
-    ret (s0 ⊕ s1)
-  }.
-
-Definition share_lr: nat := 0.
-
-Definition TSSS_pkg_tt:
+Definition SHARE_pkg_tt:
   package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
+    [interface #val #[shares]: ('word × 'word) × 'set 'nat → 'seq 'word ] :=
   [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
-      if size (domm u) >= 2 then ret emptym
+    #def #[shares] ('(ml, mr, U): ('word × 'word) × 'set 'nat): 'seq 'word {
+      if size (domm U) >= 2 then ret emptym
       else
-      s ← share mr ;;
-      ret (fmap_of_seq (pmap s (domm u)))
+      s0 <$ uniform (2^n) ;;
+      let s1 := s0 ⊕ ml in
+      let sh := [fmap (0, s0) ; (1, s1)] in
+      ret (fmap_of_seq (pmap sh (domm U)))
     }
   ].
 
-Definition TSSS_pkg_ff:
+Definition SHARE_pkg_ff:
   package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
+    [interface #val #[shares]: ('word × 'word) × 'set 'nat → 'seq 'word ] :=
   [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
-      if size (domm u) >= 2 then ret emptym
+    #def #[shares] ('(ml, mr, U): ('word × 'word) × 'set 'nat): 'seq 'word {
+      if size (domm U) >= 2 then ret emptym
       else
-      s ← share ml ;;
-      ret (fmap_of_seq (pmap s (domm u)))
-    }
-  ].
-
-Definition TSSS_HYB_pkg_tt:
-  package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
-  [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
-      match FSet.fsval (domm u) with
-      | [:: 0] =>
-        s0 <$ uniform Word_N ;;
-        ret (fmap_of_seq [:: s0])
-      | [:: 1] =>
-        s0 <$ uniform Word_N ;;
-        s1 ← ret (s0 ⊕ mr) ;;
-        ret (fmap_of_seq [:: s1])
-      | _ => ret emptym
-      end
-    }
-  ].
-
-Definition TSSS_HYB_pkg_ff:
-  package fset0 [interface]
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ] :=
-  [package
-    #def #[share_lr] ('(ml, (mr, u)): 'word × 'word × 'set 'nat): 'seq 'word {
-      match FSet.fsval (domm u) with
-      | [:: 0] =>
-        s0 <$ uniform Word_N ;;
-        ret (fmap_of_seq [:: s0])
-      | [:: 1] =>
-        s0 <$ uniform Word_N ;;
-        s1 ← ret (s0 ⊕ ml) ;;
-        ret (fmap_of_seq [:: s1])
-      | _ => ret emptym
-      end
+      s0 <$ uniform (2^n) ;;
+      let s1 := s0 ⊕ mr in
+      let sh := [fmap (0, s0) ; (1, s1)] in
+      ret (fmap_of_seq (pmap sh (domm U)))
     }
   ].
 
@@ -240,107 +190,43 @@ Definition mkpair {Lt Lf E}
   (t: package Lt [interface] E) (f: package Lf [interface] E):
   loc_GamePair E := fun b => if b then {locpackage t} else {locpackage f}.
 
-Definition TSSS := mkpair TSSS_pkg_tt TSSS_pkg_ff.
-Definition TSSS_HYB := mkpair TSSS_HYB_pkg_tt TSSS_HYB_pkg_ff.
+Definition SHARE := mkpair SHARE_pkg_tt SHARE_pkg_ff.
 
-Lemma TSSS_HYB_equiv_tt:
-  TSSS true ≈₀ TSSS_HYB true.
+Lemma SHARE_equiv:
+  SHARE true ≈₀ SHARE false.
 Proof.
   apply: eq_rel_perf_ind_eq.
   simplify_eq_rel m.
   apply rpost_weaken_rule with eq;
     last by move=> [? ?] [? ?] [].
-  case m => ml [mr u].
-  set u' := _ (domm u).
-  case: u' => [|a u'] /=.
-  1: {
-    apply: r_dead_sample_L.
-    by apply: rreflexivity_rule.
-  }
-  case: u' => [|? ?] /=.
-  2: {
-    case: a => [|[|?]].
-    all: by apply: rreflexivity_rule.
-  }
-  case: a => [|[|?]].
-  1,2: by apply: rreflexivity_rule.
-  apply: r_const_sample_L => ?.
-  by apply: rreflexivity_rule.
-Qed.
-
-Lemma TSSS_HYB_equiv:
-  TSSS_HYB true ≈₀ TSSS_HYB false.
-Proof.
-  apply: eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  apply rpost_weaken_rule with eq;
-    last by move=> [? ?] [? ?] [].
-  case m => ml [mr u].
-  set u' := _ (domm u).
-  case: u' => [|a u'].
+  case m => [[ml mr] U].
+  case: (_ (domm U)) => {U} [|a U] /=.
   1: by apply: rreflexivity_rule.
-  case: u' => [|? u'].
+  case: U => [|b U] /=.
   2: by apply: rreflexivity_rule.
-  case: a => [|[|?]].
+  case: a => [|[|a]] /=.
   1,3: by apply: rreflexivity_rule.
-  pose (f := fun (m: Word) => m ⊕ (ml ⊕ mr)).
-  assert (bij_f: bijective f).
-  {
-    subst f.
-    exists (fun x => (x ⊕ (ml ⊕ mr))) => x.
+  apply: r_uniform_bij => [|s0].
+  1: {
+    exists (fun x => x ⊕ (ml ⊕ mr)) => x.
     all: by apply: plus_involutive.
   }
-  apply r_uniform_bij with (1:=bij_f) => x.
-  unfold f.
-  rewrite plus_assoc.
-  rewrite (plus_comm ml).
-  rewrite plus_involutive.
+  rewrite plus_assoc plus_involutive.
   by apply: rreflexivity_rule.
 Qed.
 
-Lemma TSSS_HYB_equiv_ff:
-  TSSS_HYB false ≈₀ TSSS false.
-Proof.
-  apply: eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  apply rpost_weaken_rule with eq;
-    last by move=> [? ?] [? ?] [].
-  case m => ml [mr u].
-  set u' := _ (domm u).
-  case: u' => [|a u'] /=.
-  1: {
-    apply: r_dead_sample_R.
-    by apply: rreflexivity_rule.
-  }
-  case: u' => [|? ?] /=.
-  2: {
-    case: a => [|[|?]].
-    all: by apply: rreflexivity_rule.
-  }
-  case: a => [|[|?]].
-  1,2: by apply: rreflexivity_rule.
-  apply: r_const_sample_R => ?.
-  by apply: rreflexivity_rule.
-Qed.
-
+(**
+  This corresponds to Theorem 3.6 from "The Joy of Cryptography".
+*)
 Theorem unconditional_secrecy LA A:
   ValidPackage LA
-    [interface #val #[share_lr]: 'word × 'word × 'set 'nat → 'seq 'word ]
+    [interface #val #[shares]: ('word × 'word) × 'set 'nat → 'seq 'word ]
     A_export A ->
-  Advantage TSSS A = 0%R.
+  Advantage SHARE A = 0%R.
 Proof.
   move=> vA.
   rewrite Advantage_E Advantage_sym.
-  ssprove triangle (TSSS true) [::
-    pack (TSSS_HYB true)  ;
-    pack (TSSS_HYB false)
-  ] (TSSS false) A as ineq.
-  apply: AdvantageE_le_0.
-  apply: le_trans.
-  1: by apply: ineq.
-  rewrite TSSS_HYB_equiv_tt ?fdisjoints0 // GRing.add0r.
-  rewrite TSSS_HYB_equiv    ?fdisjoints0 // GRing.add0r.
-  by rewrite TSSS_HYB_equiv_ff ?fdisjoints0.
+  by rewrite SHARE_equiv ?fdisjoints0.
 Qed.
 
 End SecretSharing_example.
