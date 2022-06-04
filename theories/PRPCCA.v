@@ -114,8 +114,8 @@ Definition samp_no_repl {n} `{Positive n} {L} (r: {fset ('fin n)}): code L [inte
   {code
     let r' := compl r in
     #assert (0 < size r') as H ;;
-    k <$ @uniform _ H ;;
-    ret (sample_subset k)
+    i <$ @uniform _ H ;;
+    ret (sample_subset i)
   }.
 
 Variable (n l: nat).
@@ -228,9 +228,9 @@ Definition SAMP_pkg_tt (p: nat) `{Positive p}:
     [interface
       #val #[samp]: 'set ('fin p) → ('fin p) ] :=
   [package
-    #def #[samp] (r: 'set ('fin p)): ('fin p) {
-      k <$ uniform p ;;
-      ret k
+    #def #[samp] (S: 'set ('fin p)): ('fin p) {
+      s <$ uniform p ;;
+      ret s
     }
   ].
 
@@ -239,9 +239,9 @@ Definition SAMP_pkg_ff (p: nat) `{Positive p}:
     [interface
       #val #[samp]: 'set ('fin p) → ('fin p) ] :=
   [package
-    #def #[samp] (r: 'set ('fin p)): ('fin p) {
-      k ← samp_no_repl (domm r) ;;
-      ret k
+    #def #[samp] (S: 'set ('fin p)): ('fin p) {
+      s ← samp_no_repl (domm S) ;;
+      ret s
     }
   ].
 
@@ -291,13 +291,13 @@ Definition EVAL_pkg_tt:
       #val #[lookup]: 'ciph → 'ciph ;
       #val #[invlookup]: 'ciph → 'ciph ] :=
   [package
-    #def #[lookup] (m: 'ciph): 'ciph {
+    #def #[lookup] (x: 'ciph): 'ciph {
       k ← kgen ;;
-      ret (PRP k m)
+      ret (PRP k x)
     } ;
-    #def #[invlookup] (m: 'ciph): 'ciph {
+    #def #[invlookup] (y: 'ciph): 'ciph {
       k ← kgen ;;
-      ret (PRP' k m)
+      ret (PRP' k y)
     }
   ].
 
@@ -395,7 +395,7 @@ Definition CTXT_pkg_tt:
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       k ← kgen ;;
       ret (ciph_to_pair (PRP' k c)).1
     }
@@ -416,7 +416,7 @@ Definition CTXT_pkg_ff:
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       k ← kgen ;;
       ret (ciph_to_pair (PRP' k c)).1
     }
@@ -446,7 +446,7 @@ Definition CTXT_EVAL_pkg_tt:
     #def #[decrypt] (c: 'ciph): 'word {
       #import {sig #[invlookup]: 'ciph → 'ciph } as invlookup ;;
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       mr ← invlookup c ;;
       let (m, r) := ciph_to_pair mr in
       ret m
@@ -480,7 +480,7 @@ Definition CTXT_EVAL_SAMP_pkg:
       #import {sig #[invlookup]: 'ciph → 'ciph } as invlookup ;;
       R ← get R_loc ;;
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       mr ← invlookup c ;;
       let (m, r) := ciph_to_pair mr in
       #put R_loc := setm R r tt ;;
@@ -545,7 +545,7 @@ Definition CTXT_HYB_pkg_1:
     #def #[decrypt] (c: 'ciph): 'word {
       R ← get R_loc ;;
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       Tinv ← get Tinv_loc ;;
       mr ← match getm Tinv c with
       | None =>
@@ -603,7 +603,7 @@ Definition CTXT_HYB_pkg_2:
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       Tinv ← get Tinv_loc ;;
       Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv c with
@@ -642,7 +642,7 @@ Definition CTXT_HYB_pkg_3:
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       Tinv ← get Tinv_loc ;;
       Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv' c with
@@ -660,10 +660,8 @@ Definition CTXT_HYB_pkg_3:
     }
   ].
 
-Definition CTXT_HYB_locs_4 := (fset [:: S_loc; Tinv_loc; Tinv'_loc]).
-
 Definition CTXT_HYB_pkg_4:
-  package CTXT_HYB_locs_4
+  package CTXT_HYB_locs_2
     [interface]
     [interface
       #val #[ctxt]: 'word → 'ciph ;
@@ -679,12 +677,14 @@ Definition CTXT_HYB_pkg_4:
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       Tinv ← get Tinv_loc ;;
       Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv' c with
       | None =>
           mr <$ uniform Ciph_N ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T mr c ;;
           #put Tinv_loc := setm Tinv c mr ;;
           #put Tinv'_loc := setm Tinv' c mr ;;
           ret mr
@@ -696,7 +696,7 @@ Definition CTXT_HYB_pkg_4:
   ].
 
 Definition CTXT_HYB_pkg_5:
-  package CTXT_HYB_locs_4
+  package CTXT_HYB_locs_2
     [interface]
     [interface
       #val #[ctxt]: 'word → 'ciph ;
@@ -712,12 +712,14 @@ Definition CTXT_HYB_pkg_5:
     } ;
     #def #[decrypt] (c: 'ciph): 'word {
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       Tinv ← get Tinv_loc ;;
       Tinv' ← get Tinv'_loc ;;
       mr ← match getm Tinv c with
       | None =>
           mr <$ uniform Ciph_N ;;
+          T ← get T_loc ;;
+          #put T_loc := setm T mr c ;;
           #put Tinv_loc := setm Tinv c mr ;;
           #put Tinv'_loc := setm Tinv' c mr ;;
           ret mr
@@ -746,7 +748,7 @@ Definition CTXT_EVAL_pkg_ff:
     #def #[decrypt] (c: 'ciph): 'word {
       #import {sig #[invlookup]: 'ciph → 'ciph } as invlookup ;;
       S ← get S_loc ;;
-      #assert (c \notin (domm S)) ;;
+      #assert (c \notin domm S) ;;
       mr ← invlookup c ;;
       let (m, r) := ciph_to_pair mr in
       ret m
@@ -823,7 +825,7 @@ Proof.
     (fun '(h0, h1) => h0 = h1) ⋊
     couple_rhs T_loc R_loc
       (fun T R => forall m r,
-        r \notin (domm R) -> getm T (mkciph m r) = None)
+        r \notin domm R -> getm T (mkciph m r) = None)
   ).
   1: {
     ssprove_invariant=> //.
@@ -1018,8 +1020,10 @@ Proof.
     + ssprove_forget_all.
       by apply: r_ret.
     + ssprove_sync=> c.
-      apply: r_get_remember_lhs => T.
+      apply: r_get_remember_lhs => Tl.
+      apply: r_get_remember_rhs => Tr.
       apply: r_put_lhs.
+      apply: r_put_rhs.
       apply: r_put_vs_put.
       shelve.
     Unshelve.
@@ -1038,40 +1042,42 @@ Proof.
   ).
   1: {
     ssprove_invariant=> //.
-    all: by rewrite /CTXT_HYB_locs_4 !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
+    all: by rewrite /CTXT_HYB_locs_2 !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
   }
   simplify_eq_rel m.
-  1: {
-    apply: (@r_reflexivity_alt _ (S_loc |: fset1 R_loc)) => [loc H|loc v H].
+  - apply: (@r_reflexivity_alt _ (S_loc |: fset1 R_loc)) => [loc H|loc v H].
     all: ssprove_invariant;
       first by move=> ? ? ->.
     all: rewrite in_fsetU !in_fset1 in H.
     all: apply /eqP.
     all: by move: H => /orP [/eqP|/eqP] ->.
-  }
-  ssprove_code_simpl.
-  ssprove_code_simpl_more.
-  ssprove_sync=> [|S];
-    first by move=> ? ? ->.
-  ssprove_sync=> H1.
-  apply: r_get_vs_get_remember => Tinv.
-  apply: r_get_vs_get_remember => Tinv'.
-  apply: (r_rem_couple_rhs Tinv_loc Tinv'_loc) => ->.
-  case: (getm Tinv' m) => [c|].
-  + ssprove_forget_all.
-    by apply: r_ret.
-  + ssprove_sync=> c.
-    do 2 apply: r_put_vs_put.
-    ssprove_restore_mem;
-      last by apply: r_ret.
-    by ssprove_invariant.
+  - ssprove_code_simpl.
+    ssprove_code_simpl_more.
+    ssprove_sync=> [|S];
+      first by move=> ? ? ->.
+    ssprove_sync=> H1.
+    apply: r_get_vs_get_remember => Tinv.
+    apply: r_get_vs_get_remember => Tinv'.
+    apply: (r_rem_couple_rhs Tinv_loc Tinv'_loc) => ->.
+    case: (getm Tinv' m) => [c|].
+    + ssprove_forget_all.
+      by apply: r_ret.
+    + ssprove_sync=> c.
+      ssprove_sync=> [|T];
+        first by move=> ? ? ->.
+      ssprove_sync;
+        first by move=> ? ? ->.
+      do 2 apply: r_put_vs_put.
+      ssprove_restore_mem;
+        last by apply: r_ret.
+      by ssprove_invariant.
 Qed.
 
 Lemma CTXT_HYB_equiv_6:
   CTXT_HYB_pkg_5 ≈₀ CTXT_EVAL_pkg_ff ∘ EVAL_SAMP_pkg ∘ SAMP Ciph_N true.
 Proof.
-  apply eq_rel_perf_ind_ignore with (T_loc |: fset1 Tinv'_loc).
-  1: by rewrite !fsubU1set /CTXT_HYB_locs_4 /EVAL_locs_ff fsub1set !fset_cons !in_fsetU !in_fset1 !eq_refl !Bool.orb_true_r /=.
+  apply eq_rel_perf_ind_ignore with (fset [:: Tinv'_loc]).
+  1: by rewrite -fset1E /CTXT_HYB_locs_2 /EVAL_locs_ff fsub1set !fset_cons !in_fsetU !in_fset1 !eq_refl !Bool.orb_true_r /=.
   simplify_eq_rel m.
   all: ssprove_code_simpl.
   all: ssprove_code_simpl.
@@ -1081,15 +1087,11 @@ Proof.
     all: ssprove_invariant.
     rewrite in_fset1 in H.
     move /eqP in H.
-    rewrite H in_fsetU !in_fset1.
-    apply /norP.
-    split.
-    all: by apply /eqP.
-  - ssprove_sync=> [|S];
-      first by rewrite in_fsetU !in_fset1; apply /norP; split; apply /eqP.
+    rewrite H -fset1E in_fset1.
+    by apply /eqP.
+  - ssprove_sync=> S.
     ssprove_sync=> H1.
-    ssprove_sync=> [|Tinv];
-      first by rewrite in_fsetU !in_fset1; apply /norP; split; apply /eqP.
+    ssprove_sync=> Tinv.
     apply: r_get_remember_lhs => Tinv'.
     case: (Tinv m) => [c|] /=.
     1: {
@@ -1097,11 +1099,9 @@ Proof.
       by apply: r_ret.
     }
     ssprove_sync=> c.
-    apply: r_get_remember_rhs => T.
-    ssprove_swap_rhs 0.
-    ssprove_sync.
+    ssprove_sync=> T.
+    do 2 ssprove_sync.
     apply: r_put_lhs.
-    apply: r_put_rhs.
     ssprove_restore_mem;
       last by apply: r_ret.
     by ssprove_invariant.
@@ -1165,7 +1165,7 @@ Theorem security_based_on_prp LA A:
   fdisjoint LA (
     EVAL_locs_tt :|: EVAL_locs_ff :|: CTXT_locs :|:
     CTXT_EVAL_locs :|: CTXT_EVAL_SAMP_locs :|:
-    CTXT_HYB_locs_1 :|: CTXT_HYB_locs_2 :|: CTXT_HYB_locs_4
+    CTXT_HYB_locs_1 :|: CTXT_HYB_locs_2
     ) ->
   Advantage CTXT A <=
   prp_epsilon (A ∘ CTXT_EVAL_pkg_tt) +
@@ -1193,8 +1193,8 @@ Proof.
   apply: le_trans.
   1: by apply: ineq.
   rewrite !fdisjointUr in H.
-  move: H => /andP [/andP [/andP [/andP [/andP [/andP [/andP [H1 H2] H3] H4] H5] H6] H7] H8].
-  move: {ineq H1 H2 H3 H4 H5 H6 H7 H8} (H1, H2, H3, H4, H5, H6, H7, H8, fdisjoints0) => H.
+  move: H => /andP [/andP [/andP [/andP [/andP [/andP [H1 H2] H3] H4] H5] H6] H7].
+  move: {ineq H1 H2 H3 H4 H5 H6 H7} (H1, H2, H3, H4, H5, H6, H7, fdisjoints0) => H.
   rewrite CTXT_equiv_true ?fdisjointUr ?H // GRing.add0r.
   rewrite CTXT_EVAL_equiv_true ?fdisjointUr ?H // GRing.addr0.
   rewrite CTXT_HYB_equiv_1 ?fdisjointUr ?H // GRing.addr0.

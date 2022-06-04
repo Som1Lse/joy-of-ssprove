@@ -199,9 +199,9 @@ Definition GEN_STRETCH_pkg_tt:
     [interface #val #[query]: 'nat → ('seq 'word) × 'word ] :=
   [package
     #def #[query] (k: 'nat): ('seq 'word) × 'word {
-      s <$ uniform Word_N ;;
-      @map_loop _ 'word _ (iota 0 k) s (fun _ s =>
-        ret (PRG s)
+      s0 <$ uniform Word_N ;;
+      @map_loop _ 'word _ (iota 0 k) s0 (fun _ si =>
+        ret (PRG si)
       )
     }
   ].
@@ -262,8 +262,8 @@ Definition ATTACK_GEN_pkg:
     #def #[attack] (m: 'seq 'word): ('seq 'word) × 'word {
       #import {sig #[query]: 'nat → ('seq 'word) × 'word } as query ;;
       ts ← query (size m) ;;
-      c ← @map_loop _ 'word _ (zip (unzip2 ts.1) (unzip2 m)) tt (fun mt _ =>
-        let '(ti, mi) := (mt.1, mt.2) in
+      c ← @map_loop _ 'word _ (zip (unzip2 ts.1) (unzip2 m)) tt (fun tm _ =>
+        let (ti, mi) := (tm.1, tm.2) in
         ret (enc ti mi, tt)
       ) ;;
       ret (c.1, ts.2)
@@ -309,7 +309,7 @@ Proof.
     last by move=> [? ?] [? ?] [].
   simplify_linking.
   ssprove_code_simpl.
-  ssprove_sync_eq=> s.
+  ssprove_sync_eq=> s0.
   erewrite bind_cong.
   2: by [].
   2: {
@@ -320,7 +320,7 @@ Proof.
     apply: boolp.funext => y.
     by rewrite {1}(lock (y.1)).
   }
-  rewrite -(bind_ret _ (map_loop (unzip2 m) s _)).
+  rewrite -(bind_ret _ (map_loop (unzip2 m) s0 _)).
   erewrite bind_cong.
   2: by [].
   2: {
@@ -332,20 +332,20 @@ Proof.
   ssprove_code_simpl.
   rewrite -(size_map snd) -/unzip2.
   move: 0 (unzip2 m) => {m} a m.
-  elim: m => [|mi m IHm] /= in X a s*.
+  elim: m => [|mi m IHm] /= in X a s0*.
   1: by apply: rreflexivity_rule.
   rewrite (lock seq_to_chseq).
   ssprove_code_simpl.
-  case: (PRG s) => [s1 s2] /=.
+  case: (PRG s0) => [ti si] /=.
   rewrite -lock.
-  erewrite (bind_cong _ _ (@map_loop _ 'word _ (iota a.+1 (size m)) s2 _)).
+  erewrite (bind_cong _ _ (@map_loop _ 'word _ (iota a.+1 (size m)) si _)).
   2: by [].
   2: {
     apply: boolp.funext => x.
     by rewrite unzip2_seq_to_chseq.
   }
   ssprove_code_simpl.
-  by specialize (IHm (fun xx => X (seq_to_chseq (enc s1 mi :: unzip2 xx)))).
+  by specialize (IHm (fun x => X (seq_to_chseq (enc ti mi :: unzip2 x)))).
 Qed.
 
 Lemma ATTACK_HYB_equiv_1:
@@ -394,7 +394,7 @@ Proof.
     by [].
   }
   ssprove_code_simpl.
-  specialize (IHm (fun xx => X (seq_to_chseq (enc ci mi :: unzip2 xx)))).
+  specialize (IHm (fun s => X (seq_to_chseq (enc ci mi :: unzip2 s)))).
   by simpl in IHm.
 Qed.
 

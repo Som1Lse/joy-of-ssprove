@@ -70,9 +70,9 @@ Definition GEN_pkg_ff:
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
     #def #[query] (_: 'unit): 'word × 'word {
-      r1 <$ uniform Word_N ;;
-      r2 <$ uniform Word_N ;;
-      ret (r1, r2)
+      x <$ uniform Word_N ;;
+      y <$ uniform Word_N ;;
+      ret (x, y)
     }
   ].
 
@@ -84,7 +84,7 @@ Definition GEN_STRETCH_pkg_tt:
   [package
     #def #[query] (_: 'unit): 'word × 'word × 'word {
       s <$ uniform Word_N ;;
-      let '(x, y) := PRG s in
+      let (x, y) := PRG s in
       ret (x, PRG y)
     }
   ].

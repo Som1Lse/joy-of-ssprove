@@ -153,26 +153,26 @@ Definition GEN_pkg_ff:
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
     #def #[query] (_: 'unit): 'word × 'word {
-      r1 <$ uniform Word_N ;;
-      r2 <$ uniform Word_N ;;
-      ret (r1, r2)
+      x <$ uniform Word_N ;;
+      y <$ uniform Word_N ;;
+      ret (x, y)
     }
   ].
 
 Definition GEN := mkpair GEN_pkg_tt GEN_pkg_ff.
 
-Definition HYB_locs := fset [:: count_loc ].
+Definition GEN_HYB_locs := fset [:: count_loc ].
 
 (**
   Defining the hybrid proofs is surprisingly simple: We can just take [i] as a
   parameter, and we can use it in the package.
 
-  We diverge slightly from the book: The first hybrid is [HYB_pkg 0] rather
-  than [HYB_pkg 1]. This makes the proofs simpler, since all choices of [i]
+  We diverge slightly from the book: The first hybrid is [GEN_HYB_pkg 0] rather
+  than [GEN_HYB_pkg 1]. This makes the proofs simpler, since all choices of [i]
   are valid.
 *)
-Definition HYB_pkg i:
-  package HYB_locs
+Definition GEN_HYB_pkg i:
+  package GEN_HYB_locs
     [interface]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
@@ -180,17 +180,17 @@ Definition HYB_pkg i:
       count ← get count_loc ;;
       #put count_loc := count.+1 ;;
       if count < i then
-        r1 <$ uniform Word_N ;;
-        r2 <$ uniform Word_N ;;
-        ret (r1, r2)
+        x <$ uniform Word_N ;;
+        y <$ uniform Word_N ;;
+        ret (x, y)
       else
         s <$ uniform Word_N ;;
         ret (PRF s zero, PRF s one)
     }
   ].
 
-Definition HYB_EVAL_pkg i:
-  package HYB_locs
+Definition GEN_HYB_EVAL_pkg i:
+  package GEN_HYB_locs
     [interface #val #[lookup]: 'word → 'word ]
     [interface #val #[query]: 'unit → 'word × 'word ] :=
   [package
@@ -212,21 +212,11 @@ Definition HYB_EVAL_pkg i:
     }
   ].
 
-Definition EVAL_HYB_pkg:
-  package fset0 [interface]
-    [interface #val #[lookup]: 'word → 'word ] :=
-  [package
-    #def #[lookup] (_: 'word): 'word {
-      t <$ uniform Word_N ;;
-      ret t
-    }
-  ].
-
 Lemma GEN_equiv_true:
-  GEN true ≈₀ HYB_pkg 0.
+  GEN true ≈₀ GEN_HYB_pkg 0.
 Proof.
   apply eq_rel_perf_ind_ignore with (fset [:: count_loc]).
-  1: by rewrite -fset1E /HYB_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
+  1: by rewrite -fset1E /GEN_HYB_locs fsub1set !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
   simplify_eq_rel m.
   apply: r_get_remember_rhs => count.
   apply: r_put_rhs.
@@ -240,8 +230,8 @@ Qed.
   The proofs are fairly simple. The main trick is to realise that [k] is
   uninitialised when [count <= i].
 *)
-Lemma GEN_HYB_equiv i:
-  HYB_pkg i ≈₀ HYB_EVAL_pkg i ∘ EVAL true.
+Lemma GEN_GEN_HYB_equiv i:
+  GEN_HYB_pkg i ≈₀ GEN_HYB_EVAL_pkg i ∘ EVAL true.
 Proof.
   apply eq_rel_perf_ind with (
     (heap_ignore (fset1 k_loc)) ⋊
@@ -251,7 +241,7 @@ Proof.
   1: {
     ssprove_invariant=> //=.
     1: rewrite fsub1set.
-    all: by rewrite /HYB_locs /EVAL_locs_tt !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
+    all: by rewrite /GEN_HYB_locs /EVAL_locs_tt !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
   }
   simplify_eq_rel m.
   ssprove_code_simpl.
@@ -284,8 +274,8 @@ Proof.
     rewrite Heq /=.
     destruct (count < i) eqn:Hlt.
     all: apply: r_put_vs_put.
-    all: ssprove_sync=> r1.
-    1: ssprove_sync=> r2.
+    all: ssprove_sync=> x.
+    1: ssprove_sync=> y.
     all: ssprove_restore_mem;
       last by apply: r_ret.
     all: ssprove_invariant.
@@ -302,8 +292,8 @@ Qed.
   This proof is very similar to the previous proof, except it is [T] that is
   uninitialised when [count <= i].
 *)
-Lemma GEN_HYB_EVAL_equiv i:
-  HYB_EVAL_pkg i ∘ EVAL false ≈₀ HYB_pkg i.+1.
+Lemma GEN_GEN_HYB_EVAL_equiv i:
+  GEN_HYB_EVAL_pkg i ∘ EVAL false ≈₀ GEN_HYB_pkg i.+1.
 Proof.
   apply eq_rel_perf_ind with (
     (heap_ignore (fset1 T_loc)) ⋊
@@ -313,7 +303,7 @@ Proof.
   1: {
     ssprove_invariant => //=.
     1: rewrite fsub1set.
-    all: by rewrite /HYB_locs /EVAL_locs_ff !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
+    all: by rewrite /GEN_HYB_locs /EVAL_locs_ff !fset_cons !in_fsetU !in_fset1 eq_refl !Bool.orb_true_r.
   }
   simplify_eq_rel m.
   ssprove_code_simpl.
@@ -325,7 +315,7 @@ Proof.
     apply: (r_rem_couple_lhs count_loc T_loc) => Hinv.
     rewrite Hinv //=.
     apply: r_put_vs_put.
-    ssprove_sync=> r1.
+    ssprove_sync=> x.
     apply: r_put_lhs.
     apply: r_get_remind_lhs.
     1: {
@@ -333,7 +323,7 @@ Proof.
       by rewrite get_set_heap_eq.
     }
     rewrite setmE /=.
-    ssprove_sync=> r2.
+    ssprove_sync=> y.
     apply: r_put_lhs.
     ssprove_restore_mem;
       last by apply: r_ret.
@@ -351,8 +341,8 @@ Proof.
     all: apply: r_put_vs_put.
     1: rewrite ltnW //.
     2: rewrite ltnS leq_eqVlt Heq Hlt /=.
-    all: ssprove_sync => r1.
-    1: ssprove_sync => r2.
+    all: ssprove_sync => x.
+    1: ssprove_sync => y.
     all: ssprove_restore_mem;
       last by apply: r_ret.
     all: ssprove_invariant.
@@ -383,33 +373,33 @@ Theorem hyb_security_based_on_prf LA A q:
     [interface #val #[query]: 'unit → 'word × 'word ]
     A_export A ->
   fdisjoint LA (
-    EVAL_locs_tt :|: EVAL_locs_ff :|: HYB_locs
+    EVAL_locs_tt :|: EVAL_locs_ff :|: GEN_HYB_locs
   ) ->
-  AdvantageE (HYB_pkg 0) (HYB_pkg q) A <=
-  \sum_(i < q) prf_epsilon (A ∘ HYB_EVAL_pkg i).
+  AdvantageE (GEN_HYB_pkg 0) (GEN_HYB_pkg q) A <=
+  \sum_(i < q) prf_epsilon (A ∘ GEN_HYB_EVAL_pkg i).
 Proof.
   move=> vA H.
   elim: q => [|q IHq].
   1: by rewrite big_ord0 /AdvantageE GRing.subrr normr0.
-  ssprove triangle (HYB_pkg 0) [::
-    pack (HYB_pkg q) ;
-    HYB_EVAL_pkg q ∘ EVAL true ;
-    HYB_EVAL_pkg q ∘ EVAL false
-  ] (HYB_pkg q.+1) A
+  ssprove triangle (GEN_HYB_pkg 0) [::
+    pack (GEN_HYB_pkg q) ;
+    GEN_HYB_EVAL_pkg q ∘ EVAL true ;
+    GEN_HYB_EVAL_pkg q ∘ EVAL false
+  ] (GEN_HYB_pkg q.+1) A
   as ineq.
   apply: le_trans.
   1: by apply: ineq.
   rewrite !fdisjointUr in H.
   move: H => /andP [/andP [H1 H2] H3].
   move: {ineq H1 H2 H3} (H1, H2, H3) => H.
-  rewrite GEN_HYB_equiv ?fdisjointUr ?H // GRing.addr0.
-  rewrite GEN_HYB_EVAL_equiv ?fdisjointUr ?H // GRing.addr0.
+  rewrite GEN_GEN_HYB_equiv ?fdisjointUr ?H // GRing.addr0.
+  rewrite GEN_GEN_HYB_EVAL_equiv ?fdisjointUr ?H // GRing.addr0.
   rewrite big_ord_recr ler_add //.
   by rewrite /prf_epsilon Advantage_E Advantage_link Advantage_sym.
 Qed.
 
 (**
-  The final statement requires a proof that [A ∘ HYB_pkg q] and [A ∘ GEN false]
+  The final statement requires a proof that [A ∘ GEN_HYB_pkg q] and [A ∘ GEN false]
   are perfectly indistinguishable. The [q] for which this holds depends on the
   adversary (and might not exist for some adversaries). We sidestep this issue
   by making it a hypothesis.
@@ -419,16 +409,16 @@ Theorem security_based_on_prf LA A q:
     [interface #val #[query]: 'unit → 'word × 'word ]
     A_export A ->
   fdisjoint LA (
-    EVAL_locs_tt :|: EVAL_locs_ff :|: HYB_locs
+    EVAL_locs_tt :|: EVAL_locs_ff :|: GEN_HYB_locs
   ) ->
-  AdvantageE (HYB_pkg q) (GEN false) A = 0 ->
-  Advantage GEN A <= \sum_(i < q) prf_epsilon (A ∘ HYB_EVAL_pkg i).
+  AdvantageE (GEN_HYB_pkg q) (GEN false) A = 0 ->
+  Advantage GEN A <= \sum_(i < q) prf_epsilon (A ∘ GEN_HYB_EVAL_pkg i).
 Proof.
   move=> vA H GEN_equiv_false.
   rewrite Advantage_E Advantage_sym.
   ssprove triangle (GEN true) [::
-    pack (HYB_pkg 0) ;
-    pack (HYB_pkg q)
+    pack (GEN_HYB_pkg 0) ;
+    pack (GEN_HYB_pkg q)
   ] (GEN false) A
   as ineq.
   apply: le_trans.
